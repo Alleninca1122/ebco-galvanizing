@@ -400,15 +400,12 @@ export default function ProductionForm({ currentUser, supabase }) {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. #5, #12"
+                    placeholder="e.g. #5, If first batch enter #1"
                     value={job.customerBatchNo}
                     onChange={(e) => handleJobFieldChange(jobIndex, 'customerBatchNo', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
                     required
                   />
-                  <span className="text-[10px] text-slate-500 block mt-1">
-                    If first batch, enter #1.
-                  </span>
                 </div>
               </div>
 
@@ -478,7 +475,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                       </select>
                     </div>
 
-                    {/* Weight (lb) - Clean Integer Input */}
+                    {/* Weight (lb) */}
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">Weight (lb)</label>
                       <input
