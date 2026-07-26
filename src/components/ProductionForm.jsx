@@ -1,664 +1,787 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-export default function ProductionForm() {
-  const [rackMethod, setRackMethod] = useState('');
+// Standard Galvanizing Workpiece Types
+const WORKPIECE_TYPES = [
+  'Anchor', 'Angle', 'Beam', 'Bracket', 'Frame', 
+  'Grating', 'Ladder', 'Mesh', 'Pipe', 'Plate', 
+  'Pole', 'Railing', 'Rebar', 'Rod', 'Tube', 'Washer', 'Others'
+];
+
+// Quantity Unit Options
+const QTY_UNITS = [
+  { value: 'pcs', label: 'pcs' },
+  { value: 'bag', label: 'bag' },
+  { value: 'box', label: 'box' }
+];
+
+// Hook Option on top, followed by 30 Fixed Racks
+const RACK_OPTIONS = [
+  { value: 'HOOK', label: '🪝 Hook / Direct Sling (No Rack)' },
+  ...Array.from({ length: 30 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return { value: num, label: `Rack #${num}` };
+  })
+];
+
+// Rigging Specifications (SWL per strand in lbs)
+const RIGGING_SPECS = [
+  { id: '14_WIRE', label: '14 Gauge Wire', type: 'WIRE', swl: 50 },
+  { id: '12_WIRE', label: '12 Gauge Wire', type: 'WIRE', swl: 75 },
+  { id: '10_WIRE', label: '10 Gauge Wire', type: 'WIRE', swl: 150 },
+  { id: '38_CHAIN', label: '3/8" High Test Chain', type: 'CHAIN', swl: 4000 },
+  { id: '12_CHAIN', label: '1/2" High Test Chain', type: 'CHAIN', swl: 6500 },
+  { id: 'CLAMP', label: 'Heavy Duty Lifting Clamp', type: 'CLAMP', swl: 10000 },
+];
+
+export default function ProductionForm({ currentUser, supabase }) {
+  // Global Rack & Load Session
+  const [rackNo, setRackNo] = useState('');
   const [loadId, setLoadId] = useState('');
-  const [currentDateStr, setCurrentDateStr] = useState('');
+  const [autoLoadId, setAutoLoadId] = useState(''); 
+  const [isGeneratingLoadId, setIsGeneratingLoadId] = useState(false);
 
-  // 格式化当前日期（例如：Sunday, Jul 26, 2026）
-  useEffect(() => {
-    const updateDateTime = () => {
-      const now = new Date();
-      const options = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
-      setCurrentDateStr(now.toLocaleDateString('en-US', options));
-    };
-    updateDateTime();
-  }, []);
+  // Formatted Current Date & Day of Week
+  const currentDateFormatted = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 
+  // Jobs List
   const [jobs, setJobs] = useState([
     {
-      id: 1,
+      id: Date.now(),
       customerName: '',
-      customerOrder: '',
-      customerBatch: '',
-      // SOP & Safety Checks per Job
-      hasHollowSections: false,
-      hasSufficientVenting: true,
-      fieldVentingDone: false,
-      angleCompliant: true,
-      minClearancePass: true,
-      maxClearancePass: true,
-      surfaceCondition: 'None',
-      operatorId: '',
-      isSigned: false,
+      customerOrderNo: '',
+      customerBatchNo: '',
       workpieces: [
         {
-          id: 1,
-          type: '',
-          qty: '',
-          unit: 'PCS',
-          totalWeight: '',
-          operator: '7222',
-          methodMode: 'Individual Hanging', // Individual Hanging vs String Hanging
-          hangingType: '1 Point', // 1 Point vs 2 Points
-          point1Spec: '12 Gauge Wire',
-          point1Strands: '3',
-          point2Spec: '12 Gauge Wire',
-          point2Strands: '3'
+          id: Date.now() + 1,
+          workpieceType: '',
+          quantity: '',
+          unit: 'pcs',
+          weightLb: '', 
+          hangingMode: 'INDIVIDUAL', // 'INDIVIDUAL' or 'STRING'
+          hangingPoints: '2',
+          point1SpecId: '12_WIRE',
+          point1Strands: '',
+          point2SpecId: '12_WIRE',
+          point2Strands: ''
         }
       ]
     }
   ]);
 
-  // Handle Rack change & auto load ID
-  const handleRackChange = (e) => {
-    const val = e.target.value;
-    setRackMethod(val);
-    if (val) {
-      const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
-      setLoadId(`LD-${dateStr}-${val.replace(/\s+/g, '').toUpperCase().slice(0, 4)}-01`);
-    } else {
-      setLoadId('');
+  const getNextDailySequence = async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (!supabase) {
+      return Math.floor(Math.random() * 5) + 1;
+    }
+
+    try {
+      const { count, error } = await supabase
+        .from('production_loads')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${todayStr}T00:00:00`);
+
+      if (error) throw error;
+      return (count || 0) + 1;
+    } catch (err) {
+      console.warn('Could not fetch daily load count from Supabase, falling back to 1:', err);
+      return 1;
     }
   };
 
-  // Job Safety Verification updates
-  const updateJobSafety = (jobIndex, field, value) => {
-    const updatedJobs = [...jobs];
-    updatedJobs[jobIndex][field] = value;
-    setJobs(updatedJobs);
+  const handleRackSelect = async (selectedVal) => {
+    setRackNo(selectedVal);
+
+    if (selectedVal) {
+      setIsGeneratingLoadId(true);
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+
+      const dailySeq = await getNextDailySequence();
+
+      let generated = '';
+      if (selectedVal === 'HOOK') {
+        generated = `H00-${year}${month}${day}-${dailySeq}`;
+      } else {
+        generated = `R${selectedVal}-${year}${month}${day}-${dailySeq}`;
+      }
+
+      setAutoLoadId(generated);
+      setLoadId(generated);
+      setIsGeneratingLoadId(false);
+    } else {
+      setLoadId('');
+      setAutoLoadId('');
+    }
   };
 
-  // Workpiece property updates
-  const updateWorkpiece = (jobIndex, wpIndex, field, value) => {
-    const updatedJobs = [...jobs];
-    updatedJobs[jobIndex].workpieces[wpIndex][field] = value;
-    setJobs(updatedJobs);
+  const handleResetLoadId = () => {
+    if (autoLoadId) {
+      setLoadId(autoLoadId);
+    }
   };
 
-  // Add/Remove Workpiece/Job handlers
-  const addWorkpiece = (jobIndex) => {
-    const updatedJobs = [...jobs];
-    updatedJobs[jobIndex].workpieces.push({
-      id: Date.now(),
-      type: '',
-      qty: '',
-      unit: 'PCS',
-      totalWeight: '',
-      operator: '7222',
-      methodMode: 'Individual Hanging',
-      hangingType: '1 Point',
-      point1Spec: '12 Gauge Wire',
-      point1Strands: '3',
-      point2Spec: '12 Gauge Wire',
-      point2Strands: '3'
-    });
-    setJobs(updatedJobs);
+  const handleJobFieldChange = (jobIndex, field, value) => {
+    const updated = [...jobs];
+    updated[jobIndex][field] = value;
+    setJobs(updated);
   };
 
-  const addJob = () => {
+  const addJobRow = () => {
     setJobs([
       ...jobs,
       {
         id: Date.now(),
         customerName: '',
-        customerOrder: '',
-        customerBatch: '',
-        hasHollowSections: false,
-        hasSufficientVenting: true,
-        fieldVentingDone: false,
-        angleCompliant: true,
-        minClearancePass: true,
-        maxClearancePass: true,
-        surfaceCondition: 'None',
-        operatorId: '',
-        isSigned: false,
+        customerOrderNo: '',
+        customerBatchNo: '',
         workpieces: [
           {
-            id: Date.now(),
-            type: '',
-            qty: '',
-            unit: 'PCS',
-            totalWeight: '',
-            operator: '7222',
-            methodMode: 'Individual Hanging',
-            hangingType: '1 Point',
-            point1Spec: '12 Gauge Wire',
-            point1Strands: '3',
-            point2Spec: '12 Gauge Wire',
-            point2Strands: '3'
+            id: Date.now() + 1,
+            workpieceType: '',
+            quantity: '',
+            unit: 'pcs',
+            weightLb: '',
+            hangingMode: 'INDIVIDUAL',
+            hangingPoints: '2',
+            point1SpecId: '12_WIRE',
+            point1Strands: '',
+            point2SpecId: '12_WIRE',
+            point2Strands: ''
           }
         ]
       }
     ]);
   };
 
-  // Global Safety Gate check
-  const checkGlobalSafety = () => {
-    for (let j of jobs) {
-      if (j.hasHollowSections && !j.hasSufficientVenting && !j.fieldVentingDone) return false;
-      if (!j.angleCompliant || !j.minClearancePass || !j.maxClearancePass) return false;
-      if (!j.isSigned) return false;
-    }
-    return true;
+  const removeJobRow = (jobIndex) => {
+    if (jobs.length === 1) return;
+    setJobs(jobs.filter((_, i) => i !== jobIndex));
   };
 
-  const isFormValid = checkGlobalSafety() && rackMethod && loadId;
+  const handleWorkpieceChange = (jobIndex, wpIndex, field, value) => {
+    const updated = [...jobs];
+    updated[jobIndex].workpieces[wpIndex][field] = value;
+    setJobs(updated);
+  };
+
+  const addWorkpieceRow = (jobIndex) => {
+    const updated = [...jobs];
+    updated[jobIndex].workpieces.push({
+      id: Date.now(),
+      workpieceType: '',
+      quantity: '',
+      unit: 'pcs',
+      weightLb: '',
+      hangingMode: 'INDIVIDUAL',
+      hangingPoints: '2',
+      point1SpecId: '12_WIRE',
+      point1Strands: '',
+      point2SpecId: '12_WIRE',
+      point2Strands: ''
+    });
+    setJobs(updated);
+  };
+
+  const removeWorkpieceRow = (jobIndex, wpIndex) => {
+    const updated = [...jobs];
+    if (updated[jobIndex].workpieces.length === 1) return;
+    updated[jobIndex].workpieces = updated[jobIndex].workpieces.filter((_, i) => i !== wpIndex);
+    setJobs(updated);
+  };
+
+  const getShiftDisplay = () => {
+    const rawShift = currentUser?.shift || 'Evening';
+    return rawShift.toLowerCase().includes('shift') ? rawShift : `${rawShift} Shift`;
+  };
+
+  // Safety Verification Check
+  const checkSafetyDeficiencies = () => {
+    let deficiencies = [];
+    jobs.forEach((job, jIdx) => {
+      job.workpieces.forEach((wp, wIdx) => {
+        const totalW = parseFloat(wp.weightLb) || 0;
+        const qty = parseInt(wp.quantity, 10) || 1;
+        const unitW = totalW / qty;
+        const pts = parseInt(wp.hangingPoints, 10) || 1;
+
+        // If String Hanging, entire total weight is carried by top rigging points
+        // If Individual Hanging, weight per point is unit weight / points
+        const loadPerPt = wp.hangingMode === 'STRING' ? (totalW / pts) : (unitW / pts);
+
+        // Point 1 Check
+        const p1Obj = RIGGING_SPECS.find(r => r.id === wp.point1SpecId) || RIGGING_SPECS[0];
+        const p1Req = Math.max(1, Math.ceil(loadPerPt / p1Obj.swl));
+        const p1User = parseInt(wp.point1Strands, 10) || 0;
+        if (p1Obj.type === 'WIRE' && p1User > 0 && p1User < p1Req) {
+          deficiencies.push(`Job #${jIdx + 1} Line #${wIdx + 1} (${wp.workpieceType || 'Item'}): Point 1 wire count (${p1User}) is lower than recommended (${p1Req}).`);
+        }
+
+        // Point 2 Check
+        if (pts === 2) {
+          const p2Obj = RIGGING_SPECS.find(r => r.id === wp.point2SpecId) || RIGGING_SPECS[0];
+          const p2Req = Math.max(1, Math.ceil(loadPerPt / p2Obj.swl));
+          const p2User = parseInt(wp.point2Strands, 10) || 0;
+          if (p2Obj.type === 'WIRE' && p2User > 0 && p2User < p2Req) {
+            deficiencies.push(`Job #${jIdx + 1} Line #${wIdx + 1} (${wp.workpieceType || 'Item'}): Point 2 wire count (${p2User}) is lower than recommended (${p2Req}).`);
+          }
+        }
+      });
+    });
+    return deficiencies;
+  };
+
+  const deficiencies = checkSafetyDeficiencies();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!rackNo || !loadId.trim()) {
+      alert('Please select a Rack # or Loading Method first.');
+      return;
+    }
+
+    if (deficiencies.length > 0) {
+      const isConfirmed = window.confirm(
+        `⚠️ SAFETY WARNING:\n\n` +
+        deficiencies.join('\n') +
+        `\n\nPlease confirm if you want to proceed with these values?`
+      );
+      if (!isConfirmed) return;
+    }
+
+    const payload = {
+      global: {
+        loadId: loadId.trim(),
+        rackNo: rackNo === 'HOOK' ? 'HOOK' : `Rack #${rackNo}`,
+        operatorId: currentUser?.id || 'UNKNOWN',
+        shift: getShiftDisplay(),
+        entryDate: currentDateFormatted,
+        createdAt: new Date().toISOString()
+      },
+      jobs: jobs.map(job => ({
+        customerName: job.customerName,
+        customerOrderNo: job.customerOrderNo,
+        customerBatchNo: job.customerBatchNo || '#1',
+        workpieces: job.workpieces.map(wp => {
+          const totalW = parseInt(wp.weightLb, 10) || 0;
+          const qty = parseInt(wp.quantity, 10) || 0;
+          const unitW = qty > 0 ? Math.round(totalW / qty) : 0;
+          return {
+            workpieceType: wp.workpieceType,
+            quantity: qty,
+            unit: wp.unit || 'pcs',
+            totalWeightLb: totalW,
+            unitWeightLb: unitW,
+            rigging: {
+              hangingMode: wp.hangingMode, // 'INDIVIDUAL' or 'STRING'
+              hangingPoints: parseInt(wp.hangingPoints, 10),
+              point1: { spec: wp.point1SpecId, strands: parseInt(wp.point1Strands, 10) || 0 },
+              point2: wp.hangingPoints === '2' ? { spec: wp.point2SpecId, strands: parseInt(wp.point2Strands, 10) || 0 } : null
+            }
+          };
+        })
+      }))
+    };
+
+    console.log('Submitting Production Load Payload:', payload);
+    alert(`Load [${loadId.trim()}] recorded successfully!`);
+
+    // Reset Form
+    setRackNo('');
+    setLoadId('');
+    setAutoLoadId('');
+    setJobs([
+      {
+        id: Date.now(),
+        customerName: '',
+        customerOrderNo: '',
+        customerBatchNo: '',
+        workpieces: [
+          {
+            id: Date.now() + 1,
+            workpieceType: '',
+            quantity: '',
+            unit: 'pcs',
+            weightLb: '',
+            hangingMode: 'INDIVIDUAL',
+            hangingPoints: '2',
+            point1SpecId: '12_WIRE',
+            point1Strands: '',
+            point2SpecId: '12_WIRE',
+            point2Strands: ''
+          }
+        ]
+      }
+    ]);
+  };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-12">
-      {/* 1. Global Navigation Header (还原顶部蓝黑色跨站导航) */}
-      <header className="bg-[#0b1329] border-b border-slate-800 px-6 py-3 flex justify-between items-center text-xs">
+    <div className="w-full max-w-5xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl font-sans text-slate-100">
+      
+      {/* Header */}
+      <div className="border-b border-slate-800 pb-4 mb-6 flex justify-between items-center">
         <div>
-          <h1 className="font-bold text-sm tracking-wider text-white">EBCO Galvanizing System</h1>
-          <p className="text-[10px] text-slate-400">Integrated Shop-Floor Tracking Solution</p>
-        </div>
-
-        {/* Tab Buttons */}
-        <div className="flex bg-slate-900/80 p-1 rounded-lg border border-slate-800 gap-1">
-          <button className="bg-cyan-500 text-slate-950 px-3 py-1 rounded font-bold">
+          <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest block">
             Step 01: Loading Station
-          </button>
-          <button className="text-slate-400 hover:text-slate-200 px-3 py-1 rounded">
-            Steps 02-04: Process Portal
-          </button>
+          </span>
+          <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
 
-        {/* User Info & Shift */}
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-slate-300 font-medium">Morning Shift</div>
-            <div className="text-[10px] text-cyan-400 font-mono">👤 7222</div>
+        <div className="text-right space-y-0.5">
+          <div className="text-xs font-semibold text-slate-300">
+            📅 {currentDateFormatted}
           </div>
-          <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 text-[11px]">
-            Sign Out
-          </button>
+          <div className="text-xs font-bold text-cyan-300 font-mono">
+            🕒 {getShiftDisplay()}
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Container */}
-      <main className="max-w-5xl mx-auto mt-6 px-4 space-y-4">
-        
-        {/* 2. Main Card Header (还原 New Load Entry 标题 + 右侧动态日期与星期) */}
-        <div className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
-          <div className="flex justify-between items-start border-b border-slate-800/80 pb-4">
-            <div>
-              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block mb-1">
-                STEP 01: LOADING STATION
-              </span>
-              <h2 className="text-xl font-bold text-white tracking-wide">New Load Entry</h2>
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* 右侧星期日期 + Shift 标志 */}
-            <div className="text-right space-y-1">
-              <div className="text-xs text-slate-300 font-medium flex items-center justify-end gap-1.5">
-                <span>📅</span> {currentDateStr || 'Sunday, Jul 26, 2026'}
-              </div>
-              <span className="inline-block bg-cyan-950/80 text-cyan-400 border border-cyan-800 text-[10px] font-bold px-2 py-0.5 rounded">
-                ● Morning Shift
-              </span>
-            </div>
-          </div>
-
-          {/* 3. SOP Operating Guidelines (4步指引) */}
-          <section className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <span>📋</span> SOP Operating Guidelines
+        {/* SOP OPERATING GUIDELINES CARD */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-800/80">
+            <span className="text-sm">📋</span>
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+              SOP OPERATING GUIDELINES
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-[11px]">
-              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
-                <span className="font-bold text-cyan-400 block">1. Hollow Sections & Venting</span>
-                <p className="text-slate-300 leading-relaxed">
-                  Inspect enclosed cavities. Ensure vent holes at diagonal points to prevent 450°C bath explosion.
-                </p>
-              </div>
-              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
-                <span className="font-bold text-cyan-400 block">2. Surface Condition</span>
-                <p className="text-slate-300 leading-relaxed">
-                  Grade contaminants (None/Mild/Moderate/Severe). Marks dictate acid pickling duration.
-                </p>
-              </div>
-              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
-                <span className="font-bold text-cyan-400 block">3. Drainage Angle & Rigging</span>
-                <p className="text-slate-300 leading-relaxed">
-                  Maintain 15°–30° tilt for zinc flow. Adjust wire/chain length differential accordingly.
-                </p>
-              </div>
-              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
-                <span className="font-bold text-cyan-400 block">4. Clearance Constraints</span>
-                <p className="text-slate-300 leading-relaxed">
-                  Min Drop Clearance ≥ 50 cm (No bath contact). Max Drop Clearance ≤ 400 cm (No crane collision).
-                </p>
-              </div>
-            </div>
-          </section>
+          </div>
 
-          {/* 4. Rack Selection & Load ID */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {deficiencies.length > 0 && (
+            <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-lg text-amber-200 text-xs space-y-1">
+              <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                ⚠️ NOTICE: Wire strand count below reference value
+              </div>
+              <p className="text-[11px] text-amber-200/90">
+                One or more workpiece lines have wire strand counts below the theoretical safety recommendation. Please review item details.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
+              <div className="font-bold text-slate-200">1. Tie Wire Knotting</div>
+              <p className="text-[11px] text-slate-400">
+                Wrap wire around workpiece body at least <strong>3 full turns</strong>. Do not over-twist knots.
+              </p>
+            </div>
+            <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
+              <div className="font-bold text-slate-200">2. Drainage & Venting Angle</div>
+              <p className="text-[11px] text-slate-400">
+                Maintain a <strong>15° - 30° tilt angle</strong> for smooth zinc drainage. Ensure vent holes are open on all hollow structures.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. RACK & LOAD ID BOX */}
+        <div className="bg-slate-950 p-5 rounded-xl border border-cyan-800/60 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">RACK # / LOADING METHOD *</label>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                Rack # / Loading Method <span className="text-rose-400">*</span>
+              </label>
               <select
-                value={rackMethod}
-                onChange={handleRackChange}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                value={rackNo}
+                onChange={(e) => handleRackSelect(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-cyan-300 font-mono font-bold text-base focus:outline-none focus:border-cyan-400"
+                required
               >
                 <option value="">-- Select Rack # or Method --</option>
-                <option value="Rack A-12">Rack A-12 (Heavy Structural)</option>
-                <option value="Rack B-05">Rack B-05 (Pipe & Hollow)</option>
-                <option value="Spinner Basket">Spinner Basket (Small Parts)</option>
+                {RACK_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">LOAD ID *</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs font-bold text-slate-300 uppercase">
+                  Load ID <span className="text-rose-400">*</span>
+                </label>
+                {autoLoadId && loadId !== autoLoadId && (
+                  <button
+                    type="button"
+                    onClick={handleResetLoadId}
+                    className="text-[10px] text-cyan-400 hover:underline uppercase font-bold"
+                  >
+                    Reset Auto ID
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
-                readOnly
+                placeholder={
+                  isGeneratingLoadId 
+                    ? "Generating Load ID..." 
+                    : rackNo 
+                    ? "Enter custom ID" 
+                    : "Select Rack # first..."
+                }
                 value={loadId}
-                placeholder="Select Rack # first..."
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-lg p-2.5 text-xs text-cyan-400 font-mono"
+                onChange={(e) => setLoadId(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-cyan-300 font-mono font-bold text-base focus:outline-none focus:border-cyan-400"
+                required
               />
-            </div>
-          </section>
-
-          {/* 5. Customer Jobs Section */}
-          <div className="space-y-6 pt-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                LOADED MATERIAL BREAKDOWN ({jobs.length} JOB)
+              <span className="text-[10px] text-slate-500 block mt-1">
+                Auto-generated. Editable if needed.
               </span>
-              <button
-                onClick={addJob}
-                className="text-xs bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg transition-colors"
-              >
-                + Add Another Customer Job
-              </button>
             </div>
+          </div>
+        </div>
 
-            {jobs.map((job, jobIdx) => (
-              <div key={job.id} className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <h3 className="font-bold text-cyan-400 text-xs">JOB #{jobIdx + 1}</h3>
-                  {jobs.length > 1 && (
-                    <button
-                      onClick={() => setJobs(jobs.filter((_, idx) => idx !== jobIdx))}
-                      className="text-xs text-rose-400 hover:underline"
-                    >
-                      Remove Job
-                    </button>
-                  )}
+        {/* 2. JOB BREAKDOWN SECTION */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Loaded Material Breakdown ({jobs.length} {jobs.length === 1 ? 'Job' : 'Jobs'})
+            </span>
+            <button
+              type="button"
+              onClick={addJobRow}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold rounded-lg border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              + Add Another Customer Job
+            </button>
+          </div>
+
+          {jobs.map((job, jobIndex) => (
+            <div key={job.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+              
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                <span className="text-xs font-bold text-cyan-400 font-mono uppercase tracking-wider">
+                  Job #{jobIndex + 1}
+                </span>
+                {jobs.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeJobRow(jobIndex)}
+                    className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                  >
+                    Remove Job
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Customer Name <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ABC Steel / West Coast Fab"
+                    value={job.customerName}
+                    onChange={(e) => handleJobFieldChange(jobIndex, 'customerName', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
                 </div>
 
-                {/* Customer Info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Customer Name *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ABC Steel / West Coast Fab"
-                      value={job.customerName}
-                      onChange={(e) => {
-                        const updated = [...jobs];
-                        updated[jobIdx].customerName = e.target.value;
-                        setJobs(updated);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-100 focus:border-cyan-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Customer Order # *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 182384"
-                      value={job.customerOrder}
-                      onChange={(e) => {
-                        const updated = [...jobs];
-                        updated[jobIdx].customerOrder = e.target.value;
-                        setJobs(updated);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-100 focus:border-cyan-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Customer Batch # *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. #1, if first batch enter #1"
-                      value={job.customerBatch}
-                      onChange={(e) => {
-                        const updated = [...jobs];
-                        updated[jobIdx].customerBatch = e.target.value;
-                        setJobs(updated);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-100 focus:border-cyan-500"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Customer Order # <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    pattern="\d*"
+                    maxLength={10}
+                    placeholder="e.g. 102384"
+                    value={job.customerOrderNo}
+                    onChange={(e) => handleJobFieldChange(jobIndex, 'customerOrderNo', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
                 </div>
 
-                {/* Job Safety Checklist */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
-                  <h4 className="text-[11px] font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>⚠️</span> JOB #{jobIdx + 1} SAFETY & QUALITY VERIFICATION
-                  </h4>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Customer Batch # <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. #5, If first batch enter #1"
+                    value={job.customerBatchNo}
+                    onChange={(e) => handleJobFieldChange(jobIndex, 'customerBatchNo', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
-                    <div className="space-y-2 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                      <div className="flex justify-between items-center">
-                        <span>1. Enclosed Cavities Present?</span>
-                        <button
-                          onClick={() => updateJobSafety(jobIdx, 'hasHollowSections', !job.hasHollowSections)}
-                          className={`px-2.5 py-0.5 rounded font-bold ${job.hasHollowSections ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}
-                        >
-                          {job.hasHollowSections ? 'YES' : 'NO'}
-                        </button>
-                      </div>
-
-                      {job.hasHollowSections && (
-                        <div className="space-y-2 pt-2 border-t border-slate-800">
-                          <div className="flex justify-between items-center">
-                            <span>2. Sufficient Vent Holes?</span>
-                            <button
-                              onClick={() => updateJobSafety(jobIdx, 'hasSufficientVenting', !job.hasSufficientVenting)}
-                              className={`px-2.5 py-0.5 rounded font-bold ${job.hasSufficientVenting ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
-                            >
-                              {job.hasSufficientVenting ? 'YES' : 'NO'}
-                            </button>
-                          </div>
-
-                          {!job.hasSufficientVenting && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-rose-400">3. Field Venting Drilled On-Site?</span>
-                              <button
-                                onClick={() => updateJobSafety(jobIdx, 'fieldVentingDone', !job.fieldVentingDone)}
-                                className={`px-2.5 py-0.5 rounded font-bold ${job.fieldVentingDone ? 'bg-emerald-600 text-white' : 'bg-rose-900 text-rose-200'}`}
-                              >
-                                {job.fieldVentingDone ? 'COMPLETED' : 'PENDING'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                      <div className="flex justify-between items-center">
-                        <span>Surface Condition / Contaminants:</span>
-                        <select
-                          value={job.surfaceCondition}
-                          onChange={(e) => updateJobSafety(jobIdx, 'surfaceCondition', e.target.value)}
-                          className="bg-slate-900 border border-slate-700 text-[11px] rounded px-2 py-0.5 text-slate-200"
-                        >
-                          <option value="None">None (Clean Steel)</option>
-                          <option value="Mild">Mild (Light Oil/Rust)</option>
-                          <option value="Moderate">Moderate (Medium Oil/Mill Scale)</option>
-                          <option value="Severe">Severe (Heavy Paint/Rust)</option>
-                        </select>
-                      </div>
-
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-                        <span>Hanging Angle Compliant (15°-30°)?</span>
-                        <button
-                          onClick={() => updateJobSafety(jobIdx, 'angleCompliant', !job.angleCompliant)}
-                          className={`px-2.5 py-0.5 rounded font-bold ${job.angleCompliant ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
-                        >
-                          {job.angleCompliant ? 'YES' : 'NO'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 bg-slate-950 p-2.5 rounded-lg border border-slate-800 md:col-span-2">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex justify-between items-center">
-                          <span>Min Drop Clearance ≥ 50 cm (Prevents Bottom Touch)?</span>
-                          <button
-                            onClick={() => updateJobSafety(jobIdx, 'minClearancePass', !job.minClearancePass)}
-                            className={`px-2.5 py-0.5 rounded font-bold ${job.minClearancePass ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
-                          >
-                            {job.minClearancePass ? 'PASS' : 'FAIL'}
-                          </button>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span>Max Drop Clearance ≤ 400 cm (Prevents Collision)?</span>
-                          <button
-                            onClick={() => updateJobSafety(jobIdx, 'maxClearancePass', !job.maxClearancePass)}
-                            className={`px-2.5 py-0.5 rounded font-bold ${job.maxClearancePass ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
-                          >
-                            {job.maxClearancePass ? 'PASS' : 'FAIL'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Operator Badge & Signature */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 text-[11px]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400">Operator Badge # Signature:</span>
-                      <input
-                        type="text"
-                        placeholder="Enter Operator ID"
-                        value={job.operatorId}
-                        onChange={(e) => updateJobSafety(jobIdx, 'operatorId', e.target.value)}
-                        className="bg-slate-950 border border-slate-700 text-[11px] px-2 py-1 rounded text-cyan-300 font-mono w-32 focus:border-cyan-500"
-                      />
-                      <button
-                        disabled={!job.operatorId}
-                        onClick={() => updateJobSafety(jobIdx, 'isSigned', !job.isSigned)}
-                        className={`px-3 py-1 rounded font-bold transition-all ${
-                          job.isSigned
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-cyan-600 hover:bg-cyan-500 text-white disabled:bg-slate-800 disabled:text-slate-600'
-                        }`}
-                      >
-                        {job.isSigned ? 'SIGNED ✓' : 'CONFIRM SIGNATURE'}
-                      </button>
-                    </div>
-
-                    {!job.isSigned && (
-                      <span className="text-amber-400">⚠️ Signature required for job submission.</span>
-                    )}
-                  </div>
+              {/* Dynamic Workpiece Lines */}
+              <div className="pt-2 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Workpiece Items on this Job
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => addWorkpieceRow(jobIndex)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    + Add Workpiece Line
+                  </button>
                 </div>
 
-                {/* Workpieces Table (还原原有的 Individual/String Hanging + 1 Point / 2 Points 参数框) */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-300 uppercase">
-                      WORKPIECE ITEMS ON THIS JOB
-                    </span>
-                    <button
-                      onClick={() => addWorkpiece(jobIdx)}
-                      className="text-[11px] bg-slate-800 hover:bg-slate-700 text-cyan-300 px-2.5 py-1 rounded border border-slate-700"
-                    >
-                      + Add Workpiece Line
-                    </button>
-                  </div>
+                {job.workpieces.map((wp, wpIndex) => {
+                  const totalW = parseFloat(wp.weightLb) || 0;
+                  const qty = parseInt(wp.quantity, 10) || 0;
+                  const unitW = qty > 0 && totalW > 0 ? Math.round(totalW / qty) : 0;
 
-                  {job.workpieces.map((wp, wpIdx) => (
-                    <div key={wp.id} className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80 space-y-3">
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-                        <div>
-                          <label className="block text-[10px] text-slate-400 mb-0.5">Workpiece Type *</label>
+                  return (
+                    <div key={wp.id} className="bg-slate-900/60 p-3.5 rounded-lg border border-slate-800 space-y-3 relative">
+                      
+                      {/* Top Bar: Basic Workpiece Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="md:col-span-1">
+                          <label className="block text-[11px] text-slate-400 mb-1">
+                            Workpiece Type <span className="text-rose-400">*</span>
+                          </label>
                           <select
-                            value={wp.type}
-                            onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'type', e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"
+                            value={wp.workpieceType}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'workpieceType', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                            required
                           >
-                            <option value="">--Select--</option>
-                            <option value="Hollow Beam">Hollow Beam</option>
-                            <option value="Pipe / Tube">Pipe / Tube</option>
-                            <option value="Plate / Sheet">Plate / Sheet</option>
-                            <option value="Small Hardware">Small Hardware</option>
+                            <option value="">-- Select --</option>
+                            {WORKPIECE_TYPES.map((type) => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
                           </select>
                         </div>
+
                         <div>
-                          <label className="block text-[10px] text-slate-400 mb-0.5">Qty *</label>
+                          <label className="block text-[11px] text-slate-400 mb-1">
+                            Qty <span className="text-rose-400">*</span>
+                          </label>
                           <input
                             type="number"
-                            value={wp.qty}
-                            onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'qty', e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"
+                            min="1"
+                            value={wp.quantity}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'quantity', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            required
                           />
                         </div>
+
                         <div>
-                          <label className="block text-[10px] text-slate-400 mb-0.5">Unit</label>
+                          <label className="block text-[11px] text-slate-400 mb-1">Unit</label>
                           <select
                             value={wp.unit}
-                            onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'unit', e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'unit', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
                           >
-                            <option value="PCS">PCS</option>
-                            <option value="LBS">LBS</option>
-                            <option value="KG">KG</option>
+                            {QTY_UNITS.map((u) => (
+                              <option key={u.value} value={u.value}>{u.label}</option>
+                            ))}
                           </select>
                         </div>
+
                         <div>
-                          <label className="block text-[10px] text-slate-400 mb-0.5">Total Weight (lb)</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-[11px] text-slate-400">Total Weight (lb)</label>
+                            {unitW > 0 && (
+                              <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                                {unitW} lb/pc
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="number"
                             placeholder="Total lbs"
-                            value={wp.totalWeight}
-                            onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'totalWeight', e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200"
+                            value={wp.weightLb}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightLb', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[10px] text-slate-400 mb-0.5">Operator</label>
-                          <input
-                            type="text"
-                            value={wp.operator}
-                            readOnly
-                            className="w-full bg-slate-950/50 border border-slate-800 rounded p-1.5 text-xs text-slate-400 font-mono"
-                          />
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="block text-[11px] text-slate-400 mb-1">Operator</label>
+                            <input
+                              type="text"
+                              disabled
+                              value={currentUser?.id || '7222'}
+                              className="w-full bg-slate-900/50 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
+                            />
+                          </div>
+                          {job.workpieces.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeWorkpieceRow(jobIndex, wpIndex)}
+                              className="mt-4 text-xs text-rose-400 hover:text-rose-300 font-bold px-1"
+                              title="Delete line"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      {/* 绑挂模式选择面板 (1 Point / 2 Points 细节参数) */}
-                      <div className="bg-slate-950 p-3 rounded border border-slate-800/80 space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                            <span className="font-semibold text-slate-300">Hanging & Rigging for Line #{wpIdx + 1}</span>
-                          </div>
+                      {/* Rigging & Hanging Setup for THIS Workpiece */}
+                      <div className="pt-2.5 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-md space-y-2">
+                        
+                        {/* Top Mode Selection: Individual vs String Hanging */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-800/60">
+                          <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1">
+                            ⚙️ Hanging & Rigging for {wp.workpieceType || `Line #${wpIndex + 1}`}
+                          </span>
 
-                          <div className="flex items-center gap-2">
-                            {/* Individual vs String */}
-                            <div className="flex bg-slate-900 rounded border border-slate-800 p-0.5 text-[10px]">
+                          <div className="flex items-center gap-3">
+                            {/* Hanging Mode Switch */}
+                            <div className="inline-flex bg-slate-900 p-0.5 rounded border border-slate-800">
                               <button
-                                onClick={() => updateWorkpiece(jobIdx, wpIdx, 'methodMode', 'Individual Hanging')}
-                                className={`px-2 py-0.5 rounded font-bold ${wp.methodMode === 'Individual Hanging' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingMode', 'INDIVIDUAL')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                  wp.hangingMode !== 'STRING'
+                                    ? 'bg-cyan-600 text-slate-950 shadow'
+                                    : 'text-slate-400 hover:text-slate-200'
+                                }`}
                               >
-                                Individual Hanging
+                                🎯 Individual Hanging
                               </button>
                               <button
-                                onClick={() => updateWorkpiece(jobIdx, wpIdx, 'methodMode', 'String Hanging')}
-                                className={`px-2 py-0.5 rounded font-bold ${wp.methodMode === 'String Hanging' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingMode', 'STRING')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                  wp.hangingMode === 'STRING'
+                                    ? 'bg-cyan-600 text-slate-950 shadow'
+                                    : 'text-slate-400 hover:text-slate-200'
+                                }`}
                               >
-                                String Hanging (串挂)
+                                ⛓️ String Hanging (串挂)
                               </button>
                             </div>
 
-                            {/* 1 Point vs 2 Points */}
-                            <div className="flex bg-slate-900 rounded border border-slate-800 p-0.5 text-[10px]">
+                            {/* Single vs Two Points Toggle */}
+                            <div className="flex gap-1">
                               <button
-                                onClick={() => updateWorkpiece(jobIdx, wpIdx, 'hangingType', '1 Point')}
-                                className={`px-2 py-0.5 rounded font-bold ${wp.hangingType === '1 Point' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '1')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                                  wp.hangingPoints === '1'
+                                    ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                                }`}
                               >
-                                1 Point
+                                📍 1 Point
                               </button>
                               <button
-                                onClick={() => updateWorkpiece(jobIdx, wpIdx, 'hangingType', '2 Points')}
-                                className={`px-2 py-0.5 rounded font-bold ${wp.hangingType === '2 Points' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '2')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                                  wp.hangingPoints === '2'
+                                    ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                                }`}
                               >
-                                2 Points
+                                📍📍 2 Points
                               </button>
                             </div>
                           </div>
                         </div>
 
-                        {/* Hanging Specs Input */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
-                          <div className="grid grid-cols-2 gap-2 bg-slate-900/60 p-2 rounded border border-slate-800">
+                        {/* String hanging hint message */}
+                        {wp.hangingMode === 'STRING' && (
+                          <div className="text-[10px] text-amber-300/90 bg-amber-950/40 border border-amber-900/60 px-2 py-1 rounded">
+                            💡 <strong>String Mode Active:</strong> All {qty || 'N'} {wp.unit || 'pcs'} are chained together; total weight ({totalW || 0} lbs) is loaded onto the top rigging points.
+                          </div>
+                        )}
+
+                        {/* Rigging Dropdowns for Point 1 & Point 2 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                             <div>
-                              <label className="block text-[10px] text-slate-400 mb-0.5">Point 1 Spec *</label>
+                              <label className="block text-[10px] text-slate-400 mb-0.5">
+                                {wp.hangingPoints === '2' ? 'Point 1 Spec *' : 'Hanging Spec *'}
+                              </label>
                               <select
-                                value={wp.point1Spec}
-                                onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'point1Spec', e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-[11px] text-slate-200"
+                                value={wp.point1SpecId}
+                                onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point1SpecId', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-100"
+                                required
                               >
-                                <option>12 Gauge Wire</option>
-                                <option>10 Gauge Wire</option>
-                                <option>3/8 Chain</option>
+                                {RIGGING_SPECS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                               </select>
                             </div>
                             <div>
                               <label className="block text-[10px] text-slate-400 mb-0.5">Strands / Lines *</label>
-                              <select
+                              <input
+                                type="number"
+                                min="1"
+                                placeholder="e.g. 3"
                                 value={wp.point1Strands}
-                                onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'point1Strands', e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-[11px] text-slate-200"
-                              >
-                                <option>e.g. 3</option>
-                                <option>1</option>
-                                <option>2</option>
-                                <option>3</option>
-                                <option>4</option>
-                              </select>
+                                onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point1Strands', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-mono text-cyan-300 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                required
+                              />
                             </div>
                           </div>
 
-                          {wp.hangingType === '2 Points' && (
-                            <div className="grid grid-cols-2 gap-2 bg-slate-900/60 p-2 rounded border border-slate-800">
+                          {wp.hangingPoints === '2' && (
+                            <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                               <div>
                                 <label className="block text-[10px] text-slate-400 mb-0.5">Point 2 Spec *</label>
                                 <select
-                                  value={wp.point2Spec}
-                                  onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'point2Spec', e.target.value)}
-                                  className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-[11px] text-slate-200"
+                                  value={wp.point2SpecId}
+                                  onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point2SpecId', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-100"
+                                  required
                                 >
-                                  <option>12 Gauge Wire</option>
-                                  <option>10 Gauge Wire</option>
-                                  <option>3/8 Chain</option>
+                                  {RIGGING_SPECS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                                 </select>
                               </div>
                               <div>
                                 <label className="block text-[10px] text-slate-400 mb-0.5">Strands / Lines *</label>
-                                <select
+                                <input
+                                  type="number"
+                                  min="1"
+                                  placeholder="e.g. 3"
                                   value={wp.point2Strands}
-                                  onChange={(e) => updateWorkpiece(jobIdx, wpIdx, 'point2Strands', e.target.value)}
-                                  className="w-full bg-slate-950 border border-slate-800 rounded p-1 text-[11px] text-slate-200"
-                                >
-                                  <option>e.g. 3</option>
-                                  <option>1</option>
-                                  <option>2</option>
-                                  <option>3</option>
-                                  <option>4</option>
-                                </select>
+                                  onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point2Strands', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-mono text-cyan-300 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  required
+                                />
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Submit Safety Gate Button */}
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          ))}
+        </div>
+
+        {/* Submit */}
+        <div className="pt-4 border-t border-slate-800">
           <button
-            disabled={!isFormValid}
-            className={`w-full py-3.5 rounded-xl font-bold uppercase tracking-wider text-xs shadow-xl transition-all ${
-              isFormValid
-                ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 cursor-pointer'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-            }`}
+            type="submit"
+            className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 cursor-pointer transition-all"
           >
-            {isFormValid ? 'CONFIRM & COMPLETE LOADING ENTRY →' : '🔒 COMPLETE SAFETY VERIFICATION & SIGNATURE TO PROCEED'}
+            Confirm & Complete Loading Entry →
           </button>
         </div>
-      </main>
+
+      </form>
     </div>
   );
 }
