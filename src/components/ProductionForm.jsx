@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, ShieldAlert, Lock, Unlock, HelpCircle } from 'lucide-react';
 
 export default function ProductionForm() {
   const [rackMethod, setRackMethod] = useState('');
@@ -141,7 +140,7 @@ export default function ProductionForm() {
         {/* Global SOP Operating Guidelines (4 Steps) */}
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-cyan-400" /> Standard Operating Guidelines (SOP Checklist)
+            <span>📋</span> Standard Operating Guidelines (SOP Checklist)
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
             
@@ -173,8 +172,8 @@ export default function ProductionForm() {
             <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-1.5">
               <span className="font-bold text-cyan-400 block">4. Clearance Constraints</span>
               <p className="text-slate-300">
-                <strong>Min Drop Clearance:</strong> $\ge 50\text{ cm}$ (Prevents bath bottom contact).<br/>
-                <strong>Max Drop Clearance:</strong> $\le 400\text{ cm}$ (Prevents crane collision during cross-bay transfer).
+                <strong>Min Drop Clearance:</strong> ≥ 50 cm (Prevents bath bottom contact).<br/>
+                <strong>Max Drop Clearance:</strong> ≤ 400 cm (Prevents crane collision during cross-bay transfer).
               </p>
             </div>
 
@@ -272,7 +271,7 @@ export default function ProductionForm() {
             {/* Job Safety & SOP Compliance Gatekeeper */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
               <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-amber-400" /> Job #{jobIdx + 1} Safety & Quality Verification
+                <span>⚠️</span> Job #{jobIdx + 1} Safety & Quality Verification
               </h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -347,7 +346,7 @@ export default function ProductionForm() {
                 <div className="space-y-2 bg-slate-900/50 p-3 rounded-lg border border-slate-800 md:col-span-2">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex justify-between items-center">
-                      <span>Min Drop Clearance $\ge 50\text{ cm}$ (Prevents Bottom Touch)?</span>
+                      <span>Min Drop Clearance ≥ 50 cm (Prevents Bottom Touch)?</span>
                       <button
                         onClick={() => updateJobSafety(jobIdx, 'minClearancePass', !job.minClearancePass)}
                         className={`px-3 py-1 rounded text-xs font-bold ${job.minClearancePass ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
@@ -357,7 +356,7 @@ export default function ProductionForm() {
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span>Max Drop Clearance $\le 400\text{ cm}$ (Prevents Collision)?</span>
+                      <span>Max Drop Clearance ≤ 400 cm (Prevents Collision)?</span>
                       <button
                         onClick={() => updateJobSafety(jobIdx, 'maxClearancePass', !job.maxClearancePass)}
                         className={`px-3 py-1 rounded text-xs font-bold ${job.maxClearancePass ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
@@ -396,7 +395,7 @@ export default function ProductionForm() {
 
                 {!job.isSigned && (
                   <span className="text-xs text-amber-400 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Signature required for job submission.
+                    ⚠️ Signature required for job submission.
                   </span>
                 )}
               </div>
@@ -475,8 +474,7 @@ export default function ProductionForm() {
               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
           }`}
         >
-          {isFormValid ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-          Confirm & Complete Loading Entry →
+          {isFormValid ? '🔓 CONFIRM & COMPLETE LOADING ENTRY →' : '🔒 SAFETY GATE LOCKED (COMPLETE VERIFICATION & SIGNATURE)'}
         </button>
 
       </div>
