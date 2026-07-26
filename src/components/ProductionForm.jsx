@@ -1,44 +1,33 @@
 import React, { useState } from 'react';
-import { 
-  ShieldAlert, 
-  BookOpen, 
-  AlertCircle, 
-  CheckCircle2, 
-  Info, 
-  Send, 
-  Plus, 
-  Trash2, 
-  UserCheck, 
-  Clock, 
-  Calendar 
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldAlert, Lock, Unlock, HelpCircle } from 'lucide-react';
 
 export default function ProductionForm() {
-  const [activeTab, setActiveTab] = useState('loading'); // loading, process
-  const [shift, setShift] = useState('Morning Shift');
-  const [operatorId, setOperatorId] = useState('7222');
-  
-  // Header / Common States
   const [rackMethod, setRackMethod] = useState('');
   const [loadId, setLoadId] = useState('');
-
-  // Customer Jobs State
   const [jobs, setJobs] = useState([
     {
       id: 1,
       customerName: '',
       customerOrder: '',
       customerBatch: '',
-      items: [
+      // SOP & Safety Checks per Job
+      hasHollowSections: false,
+      hasSufficientVenting: true,
+      fieldVentingDone: false,
+      angleCompliant: true,
+      minClearancePass: true, // >= 50cm
+      maxClearancePass: true, // <= 400cm
+      surfaceCondition: 'None', // None, Mild, Moderate, Severe
+      operatorId: '',
+      isSigned: false,
+      workpieces: [
         {
           id: 1,
-          workpieceType: '',
+          type: '',
           qty: '',
-          unit: 'pcs',
+          unit: 'PCS',
           totalWeight: '',
-          operator: '7222',
-          hangingStyle: 'Individual Hanging',
-          points: '1 & 2 Points',
+          hangingType: '1-Point',
           point1Spec: '12 Gauge Wire',
           point1Strands: '3',
           point2Spec: '12 Gauge Wire',
@@ -48,8 +37,44 @@ export default function ProductionForm() {
     }
   ]);
 
-  // Handle adding new job block
-  const handleAddJob = () => {
+  // Handle Rack change & auto load ID
+  const handleRackChange = (e) => {
+    const val = e.target.value;
+    setRackMethod(val);
+    if (val) {
+      const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+      setLoadId(`LD-${dateStr}-${val.replace(/\s+/g, '').toUpperCase().slice(0, 4)}-01`);
+    } else {
+      setLoadId('');
+    }
+  };
+
+  // Job Safety Verification updates
+  const updateJobSafety = (jobIndex, field, value) => {
+    const updatedJobs = [...jobs];
+    updatedJobs[jobIndex][field] = value;
+    setJobs(updatedJobs);
+  };
+
+  // Add/Remove Workpiece/Job handlers
+  const addWorkpiece = (jobIndex) => {
+    const updatedJobs = [...jobs];
+    updatedJobs[jobIndex].workpieces.push({
+      id: Date.now(),
+      type: '',
+      qty: '',
+      unit: 'PCS',
+      totalWeight: '',
+      hangingType: '1-Point',
+      point1Spec: '12 Gauge Wire',
+      point1Strands: '3',
+      point2Spec: '12 Gauge Wire',
+      point2Strands: '3'
+    });
+    setJobs(updatedJobs);
+  };
+
+  const addJob = () => {
     setJobs([
       ...jobs,
       {
@@ -57,16 +82,23 @@ export default function ProductionForm() {
         customerName: '',
         customerOrder: '',
         customerBatch: '',
-        items: [
+        hasHollowSections: false,
+        hasSufficientVenting: true,
+        fieldVentingDone: false,
+        angleCompliant: true,
+        minClearancePass: true,
+        maxClearancePass: true,
+        surfaceCondition: 'None',
+        operatorId: '',
+        isSigned: false,
+        workpieces: [
           {
-            id: Date.now() + 1,
-            workpieceType: '',
+            id: Date.now(),
+            type: '',
             qty: '',
-            unit: 'pcs',
+            unit: 'PCS',
             totalWeight: '',
-            operator: operatorId,
-            hangingStyle: 'Individual Hanging',
-            points: '1 & 2 Points',
+            hangingType: '1-Point',
             point1Spec: '12 Gauge Wire',
             point1Strands: '3',
             point2Spec: '12 Gauge Wire',
@@ -77,441 +109,377 @@ export default function ProductionForm() {
     ]);
   };
 
-  // Handle adding new item line within a job
-  const handleAddItem = (jobId) => {
-    setJobs(jobs.map(job => {
-      if (job.id === jobId) {
-        return {
-          ...job,
-          items: [
-            ...job.items,
-            {
-              id: Date.now(),
-              workpieceType: '',
-              qty: '',
-              unit: 'pcs',
-              totalWeight: '',
-              operator: operatorId,
-              hangingStyle: 'Individual Hanging',
-              points: '1 & 2 Points',
-              point1Spec: '12 Gauge Wire',
-              point1Strands: '3',
-              point2Spec: '12 Gauge Wire',
-              point2Strands: '3'
-            }
-          ]
-        };
-      }
-      return job;
-    }));
+  // Global Safety Gate check
+  const checkGlobalSafety = () => {
+    for (let j of jobs) {
+      if (j.hasHollowSections && !j.hasSufficientVenting && !j.fieldVentingDone) return false;
+      if (!j.angleCompliant || !j.minClearancePass || !j.maxClearancePass) return false;
+      if (!j.isSigned) return false;
+    }
+    return true;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Submitting Full Production Entry:', {
-      shift,
-      operatorId,
-      rackMethod,
-      loadId,
-      jobs
-    });
-    alert('Production Load Entry Saved Successfully!');
-  };
+  const isFormValid = checkGlobalSafety() && rackMethod && loadId;
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans">
-      {/* Top Global Navigation Bar */}
-      <header className="bg-[#111827] border-b border-slate-800 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-sky-500 text-slate-950 font-black px-2 py-1 rounded text-sm tracking-wider">
-            EBCO
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
+        {/* Header */}
+        <header className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+          <div>
+            <h1 className="text-xl font-bold tracking-wide text-cyan-400">EBCO Galvanizing System</h1>
+            <p className="text-xs text-slate-400">Shop-Floor Loading & Safety Compliance Portal</p>
+          </div>
+          <div className="text-right">
+            <span className="inline-block bg-cyan-950 text-cyan-300 text-xs px-3 py-1 rounded-full border border-cyan-800 font-mono">
+              Shift: Morning | Station #01
+            </span>
+          </div>
+        </header>
+
+        {/* Global SOP Operating Guidelines (4 Steps) */}
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-cyan-400" /> Standard Operating Guidelines (SOP Checklist)
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            
+            {/* Step 1 */}
+            <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-1.5">
+              <span className="font-bold text-cyan-400 block">1. Hollow Sections & Venting</span>
+              <p className="text-slate-300">
+                Inspect for enclosed cavities. Ensure vent holes exist at highest & lowest diagonal points to prevent explosion risk in 450°C zinc bath.
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-1.5">
+              <span className="font-bold text-cyan-400 block">2. Surface Condition</span>
+              <p className="text-slate-300">
+                Grade contaminants: <strong>None</strong>, <strong>Mild</strong>, <strong>Moderate</strong>, or <strong>Severe</strong> (oil/paint/heavy rust). Marks determine acid pickling time.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-1.5">
+              <span className="font-bold text-cyan-400 block">3. Drainage Angle & Rigging</span>
+              <p className="text-slate-300">
+                Maintain 15°–30° tilt for efficient zinc flow. Adjust wire/chain length differential based on rigging point distance.
+              </p>
+            </div>
+
+            {/* Step 4 */}
+            <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-1.5">
+              <span className="font-bold text-cyan-400 block">4. Clearance Constraints</span>
+              <p className="text-slate-300">
+                <strong>Min Drop Clearance:</strong> $\ge 50\text{ cm}$ (Prevents bath bottom contact).<br/>
+                <strong>Max Drop Clearance:</strong> $\le 400\text{ cm}$ (Prevents crane collision during cross-bay transfer).
+              </p>
+            </div>
+
+          </div>
+        </section>
+
+        {/* Rack Selection & Load ID Generation */}
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">RACK # / LOADING METHOD *</label>
+            <select
+              value={rackMethod}
+              onChange={handleRackChange}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="">-- Select Rack # or Method --</option>
+              <option value="Rack A-12">Rack A-12 (Heavy Structural)</option>
+              <option value="Rack B-05">Rack B-05 (Pipe & Hollow)</option>
+              <option value="Spinner Basket">Spinner Basket (Small Parts)</option>
+            </select>
           </div>
           <div>
-            <h1 className="text-base font-bold text-white leading-tight">
-              EBCO Galvanizing System
-            </h1>
-            <p className="text-[11px] text-slate-400">
-              Integrated Shop-Floor Tracking Solution
-            </p>
+            <label className="block text-xs font-medium text-slate-400 mb-1">LOAD ID *</label>
+            <input
+              type="text"
+              readOnly
+              value={loadId}
+              placeholder="Auto-generated based on Rack..."
+              className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2.5 text-sm text-cyan-400 font-mono"
+            />
           </div>
-        </div>
+        </section>
 
-        {/* Tab Navigation Buttons */}
-        <div className="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
-          <button
-            onClick={() => setActiveTab('loading')}
-            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeTab === 'loading'
-                ? 'bg-sky-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Step 01: Loading Station
-          </button>
-          <button
-            onClick={() => setActiveTab('process')}
-            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeTab === 'process'
-                ? 'bg-sky-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Steps 02-04: Process Portal
-          </button>
-        </div>
+        {/* Customer Jobs Breakdown */}
+        {jobs.map((job, jobIdx) => (
+          <section key={job.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-5">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-cyan-400 text-sm">JOB #{jobIdx + 1} BREAKDOWN</h3>
+              {jobs.length > 1 && (
+                <button
+                  onClick={() => setJobs(jobs.filter((_, idx) => idx !== jobIdx))}
+                  className="text-xs text-rose-400 hover:underline"
+                >
+                  Remove Job
+                </button>
+              )}
+            </div>
 
-        {/* User / Shift Indicator */}
-        <div className="flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-md">
-            <Clock className="w-3.5 h-3.5 text-sky-400" />
-            <div className="text-right">
-              <div className="text-slate-200 font-medium">{shift}</div>
-              <div className="text-[10px] text-slate-400 flex items-center gap-1 justify-end">
-                <UserCheck className="w-3 h-3 text-emerald-400" />
-                <span>ID: {operatorId}</span>
+            {/* Customer Metadata */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Customer Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. ABC Steel Fab"
+                  value={job.customerName}
+                  onChange={(e) => {
+                    const updated = [...jobs];
+                    updated[jobIdx].customerName = e.target.value;
+                    setJobs(updated);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Customer Order #</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 182384"
+                  value={job.customerOrder}
+                  onChange={(e) => {
+                    const updated = [...jobs];
+                    updated[jobIdx].customerOrder = e.target.value;
+                    setJobs(updated);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Customer Batch #</label>
+                <input
+                  type="text"
+                  placeholder="e.g. #1"
+                  value={job.customerBatch}
+                  onChange={(e) => {
+                    const updated = [...jobs];
+                    updated[jobIdx].customerBatch = e.target.value;
+                    setJobs(updated);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:border-cyan-500"
+                />
               </div>
             </div>
-          </div>
-          <button className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-md border border-slate-700 transition-colors">
-            Sign Out
-          </button>
-        </div>
-      </header>
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto p-6 space-y-6">
-        
-        {/* Step 01 Banner */}
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold tracking-widest text-sky-400 uppercase">
-              Step 01: Loading Station
-            </span>
-            <h2 className="text-2xl font-extrabold text-white">New Load Entry</h2>
-          </div>
-          <div className="text-right text-xs text-slate-400 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-slate-500" />
-            <span>Sunday, Jul 26, 2026</span>
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 ml-1"></span>
-            <span className="text-emerald-400 font-medium">{shift}</span>
-          </div>
-        </div>
+            {/* Job Safety & SOP Compliance Gatekeeper */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-amber-400" /> Job #{jobIdx + 1} Safety & Quality Verification
+              </h4>
 
-        {/* SOP Operating Guidelines Card */}
-        <div className="bg-[#111827]/80 border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
-          <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider border-b border-slate-800 pb-2">
-            <BookOpen className="w-4 h-4" />
-            <span>SOP Operating Guidelines</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
-              <div className="text-xs font-bold text-slate-200">1. Tie Wire Knotting</div>
-              <p className="text-[11px] text-slate-400">
-                Wrap wire around workpiece body at least 3 full turns. Do not over-twist knots.
-              </p>
-            </div>
-            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800/80 space-y-1">
-              <div className="text-xs font-bold text-slate-200">2. Drainage & Venting Angle</div>
-              <p className="text-[11px] text-slate-400">
-                Maintain a 15° - 30° tilt angle for smooth zinc drainage. Ensure vent holes are open on all hollow structures.
-              </p>
-            </div>
-          </div>
-        </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                
+                {/* 1. Hollow & Venting */}
+                <div className="space-y-2 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                  <div className="flex justify-between items-center">
+                    <span>1. Enclosed Cavities Present?</span>
+                    <button
+                      onClick={() => updateJobSafety(jobIdx, 'hasHollowSections', !job.hasHollowSections)}
+                      className={`px-3 py-1 rounded text-xs font-bold ${job.hasHollowSections ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}
+                    >
+                      {job.hasHollowSections ? 'YES' : 'NO'}
+                    </button>
+                  </div>
 
-        {/* Form Main Area */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* Rack Selector & Load ID Block */}
-          <div className="bg-[#111827]/80 border border-slate-800 rounded-xl p-4 shadow-lg grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                Rack # / Loading Method <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={rackMethod}
-                onChange={(e) => {
-                  setRackMethod(e.target.value);
-                  if (e.target.value && !loadId) {
-                    setLoadId(`LOAD-${Date.now().toString().slice(-6)}`);
-                  }
-                }}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
-                required
-              >
-                <option value="">-- Select Rack # or Method --</option>
-                <option value="Rack A">Rack A</option>
-                <option value="Rack B">Rack B</option>
-                <option value="Rack C">Rack C</option>
-                <option value="Basket">Basket</option>
-              </select>
-            </div>
+                  {job.hasHollowSections && (
+                    <div className="space-y-2 pt-2 border-t border-slate-800">
+                      <div className="flex justify-between items-center">
+                        <span>2. Sufficient Vent Holes?</span>
+                        <button
+                          onClick={() => updateJobSafety(jobIdx, 'hasSufficientVenting', !job.hasSufficientVenting)}
+                          className={`px-3 py-1 rounded text-xs font-bold ${job.hasSufficientVenting ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+                        >
+                          {job.hasSufficientVenting ? 'YES' : 'NO'}
+                        </button>
+                      </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                Load ID <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={loadId}
-                onChange={(e) => setLoadId(e.target.value)}
-                placeholder="Select Rack # first..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500"
-                required
-              />
-              <p className="text-[10px] text-slate-500 mt-1">Auto-generated. Editable if needed.</p>
-            </div>
-          </div>
+                      {!job.hasSufficientVenting && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-rose-400">3. Field Venting Drilled On-Site?</span>
+                          <button
+                            onClick={() => updateJobSafety(jobIdx, 'fieldVentingDone', !job.fieldVentingDone)}
+                            className={`px-3 py-1 rounded text-xs font-bold ${job.fieldVentingDone ? 'bg-emerald-600 text-white' : 'bg-rose-900 text-rose-200'}`}
+                          >
+                            {job.fieldVentingDone ? 'COMPLETED' : 'PENDING'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-          {/* Customer Jobs Section Header */}
-          <div className="flex items-center justify-between pt-2">
-            <h3 className="text-xs font-bold text-sky-400 uppercase tracking-wider">
-              Loaded Material Breakdown ({jobs.length} Job{jobs.length > 1 ? 's' : ''})
-            </h3>
-            <button
-              type="button"
-              onClick={handleAddJob}
-              className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Another Customer Job
-            </button>
-          </div>
+                {/* 2. Surface Condition & Angle */}
+                <div className="space-y-2 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                  <div className="flex justify-between items-center">
+                    <span>Surface Condition / Contaminants:</span>
+                    <select
+                      value={job.surfaceCondition}
+                      onChange={(e) => updateJobSafety(jobIdx, 'surfaceCondition', e.target.value)}
+                      className="bg-slate-950 border border-slate-700 text-xs rounded px-2 py-1 text-slate-200"
+                    >
+                      <option value="None">None (Clean Steel)</option>
+                      <option value="Mild">Mild (Light Oil/Rust)</option>
+                      <option value="Moderate">Moderate (Medium Oil/Mill Scale)</option>
+                      <option value="Severe">Severe (Heavy Paint/Rust)</option>
+                    </select>
+                  </div>
 
-          {/* Render Job Cards */}
-          {jobs.map((job, jobIdx) => (
-            <div key={job.id} className="bg-[#111827]/80 border border-sky-950/60 rounded-xl p-5 shadow-xl space-y-4">
-              <div className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800 pb-2">
-                <span>Job #{jobIdx + 1}</span>
-                {jobs.length > 1 && (
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+                    <span>Hanging Drainage Angle Compliant (15°-30°)?</span>
+                    <button
+                      onClick={() => updateJobSafety(jobIdx, 'angleCompliant', !job.angleCompliant)}
+                      className={`px-3 py-1 rounded text-xs font-bold ${job.angleCompliant ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+                    >
+                      {job.angleCompliant ? 'YES' : 'NO'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Clearance Constraints */}
+                <div className="space-y-2 bg-slate-900/50 p-3 rounded-lg border border-slate-800 md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex justify-between items-center">
+                      <span>Min Drop Clearance $\ge 50\text{ cm}$ (Prevents Bottom Touch)?</span>
+                      <button
+                        onClick={() => updateJobSafety(jobIdx, 'minClearancePass', !job.minClearancePass)}
+                        className={`px-3 py-1 rounded text-xs font-bold ${job.minClearancePass ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+                      >
+                        {job.minClearancePass ? 'PASS' : 'FAIL'}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span>Max Drop Clearance $\le 400\text{ cm}$ (Prevents Collision)?</span>
+                      <button
+                        onClick={() => updateJobSafety(jobIdx, 'maxClearancePass', !job.maxClearancePass)}
+                        className={`px-3 py-1 rounded text-xs font-bold ${job.maxClearancePass ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+                      >
+                        {job.maxClearancePass ? 'PASS' : 'FAIL'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Digital Signature */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Operator Badge # Signature:</span>
+                  <input
+                    type="text"
+                    placeholder="Enter Operator ID"
+                    value={job.operatorId}
+                    onChange={(e) => updateJobSafety(jobIdx, 'operatorId', e.target.value)}
+                    className="bg-slate-950 border border-slate-700 text-xs px-2.5 py-1.5 rounded text-cyan-300 font-mono focus:border-cyan-500"
+                  />
                   <button
-                    type="button"
-                    onClick={() => setJobs(jobs.filter(j => j.id !== job.id))}
-                    className="text-slate-500 hover:text-rose-400 transition-colors"
+                    disabled={!job.operatorId}
+                    onClick={() => updateJobSafety(jobIdx, 'isSigned', !job.isSigned)}
+                    className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                      job.isSigned
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-cyan-600 hover:bg-cyan-500 text-white disabled:bg-slate-800 disabled:text-slate-600'
+                    }`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {job.isSigned ? 'SIGNED ✓' : 'CONFIRM SIGNATURE'}
                   </button>
+                </div>
+
+                {!job.isSigned && (
+                  <span className="text-xs text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Signature required for job submission.
+                  </span>
                 )}
               </div>
+            </div>
 
-              {/* Customer Info Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Customer Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. ABC Steel / West Coast Fab"
-                    value={job.customerName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setJobs(jobs.map(j => j.id === job.id ? { ...j, customerName: val } : j));
-                    }}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Customer Order # <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 302364"
-                    value={job.customerOrder}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setJobs(jobs.map(j => j.id === job.id ? { ...j, customerOrder: val } : j));
-                    }}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Customer Batch # <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. #5, IF first batch enter #1"
-                    value={job.customerBatch}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setJobs(jobs.map(j => j.id === job.id ? { ...j, customerBatch: val } : j));
-                    }}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Workpiece Items Title & Add Button */}
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                  Workpiece Items on This Job
-                </span>
+            {/* Workpiece Items Sub-Table */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-300 uppercase">Workpiece Items on Job #{jobIdx + 1}</span>
                 <button
-                  type="button"
-                  onClick={() => handleAddItem(job.id)}
-                  className="flex items-center gap-1 text-sky-400 hover:text-sky-300 text-xs font-semibold transition-colors"
+                  onClick={() => addWorkpiece(jobIdx)}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-300 px-3 py-1 rounded border border-slate-700"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Workpiece Line
+                  + Add Workpiece Line
                 </button>
               </div>
 
-              {/* Workpiece Items Lines */}
-              {job.items.map((item, itemIdx) => (
-                <div key={item.id} className="bg-slate-900/90 border border-slate-800 rounded-lg p-3 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Workpiece Type <span className="text-rose-500">*</span>
-                      </label>
+              {job.workpieces.map((wp, wpIdx) => (
+                <div key={wp.id} className="bg-slate-950/40 p-3 rounded-lg border border-slate-800 space-y-2">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Workpiece Type"
+                      className="bg-slate-950 border border-slate-800 rounded p-1.5 text-xs"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      className="bg-slate-950 border border-slate-800 rounded p-1.5 text-xs"
+                    />
+                    <select className="bg-slate-950 border border-slate-800 rounded p-1.5 text-xs">
+                      <option>PCS</option>
+                      <option>LBS</option>
+                      <option>KG</option>
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Total Weight"
+                      className="bg-slate-950 border border-slate-800 rounded p-1.5 text-xs"
+                    />
+                    <div className="flex items-center gap-1">
                       <select
-                        value={item.workpieceType}
+                        value={wp.hangingType}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setJobs(jobs.map(j => j.id === job.id ? {
-                            ...j,
-                            items: j.items.map(it => it.id === item.id ? { ...it, workpieceType: val } : it)
-                          } : j));
+                          const updated = [...jobs];
+                          updated[jobIdx].workpieces[wpIdx].hangingType = e.target.value;
+                          setJobs(updated);
                         }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                        required
+                        className="bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-cyan-400 w-full"
                       >
-                        <option value="">-- Select --</option>
-                        <option value="Structural Beam">Structural Beam</option>
-                        <option value="Pipe / Tube">Pipe / Tube</option>
-                        <option value="Plate / Bracket">Plate / Bracket</option>
-                        <option value="Custom Assembly">Custom Assembly</option>
+                        <option value="1-Point">1-Point Hanging</option>
+                        <option value="2-Point">2-Point Hanging</option>
                       </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Qty <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={item.qty}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setJobs(jobs.map(j => j.id === job.id ? {
-                            ...j,
-                            items: j.items.map(it => it.id === item.id ? { ...it, qty: val } : it)
-                          } : j));
-                        }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">Unit</label>
-                      <input
-                        type="text"
-                        value={item.unit}
-                        readOnly
-                        className="w-full bg-slate-950/50 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-400 cursor-not-allowed"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">Total Weight (lb)</label>
-                      <input
-                        type="text"
-                        placeholder="Total lbs"
-                        value={item.totalWeight}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setJobs(jobs.map(j => j.id === job.id ? {
-                            ...j,
-                            items: j.items.map(it => it.id === item.id ? { ...it, totalWeight: val } : it)
-                          } : j));
-                        }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">Operator</label>
-                      <input
-                        type="text"
-                        value={item.operator}
-                        readOnly
-                        className="w-full bg-slate-950/50 border border-slate-800 rounded px-2 py-1.5 text-xs text-slate-400 cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Hanging & Rigging Config */}
-                  <div className="bg-slate-950/60 p-2.5 rounded border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sky-400 font-bold">⚙️ Hanging & Rigging for Line #{itemIdx + 1}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] px-2 py-0.5 rounded">
-                          ● Individual Hanging
-                        </span>
-                        <span className="bg-slate-900 text-slate-400 border border-slate-800 text-[10px] px-2 py-0.5 rounded">
-                          String Hanging (串挂)
-                        </span>
-                        <span className="bg-sky-950 text-sky-400 border border-sky-800 text-[10px] px-2 py-0.5 rounded font-mono">
-                          1 Point
-                        </span>
-                        <span className="bg-sky-500 text-slate-950 font-bold text-[10px] px-2 py-0.5 rounded font-mono">
-                          1 & 2 Points
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Point Specs */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
-                      <div className="bg-slate-900 p-2 rounded border border-slate-800 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-slate-400">Point 1 Spec *</div>
-                          <div className="font-semibold text-slate-200">{item.point1Spec}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[10px] text-slate-400">Strands / Lines *</div>
-                          <div className="font-mono text-sky-400 font-bold">4-5 / 3</div>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900 p-2 rounded border border-slate-800 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-slate-400">Point 2 Spec *</div>
-                          <div className="font-semibold text-slate-200">{item.point2Spec}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[10px] text-slate-400">Strands / Lines *</div>
-                          <div className="font-mono text-sky-400 font-bold">4-5 / 3</div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          ))}
+          </section>
+        ))}
 
-          {/* Submit Action */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              className="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-3 px-6 rounded-xl text-sm shadow-lg shadow-sky-500/10 transition-all flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              CONFIRM & COMPLETE LOADING ENTRY
-            </button>
-          </div>
+        {/* Add Another Customer Job Button */}
+        <button
+          onClick={addJob}
+          className="w-full bg-slate-900 border border-dashed border-slate-700 hover:border-cyan-500 text-cyan-400 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+        >
+          + Add Another Customer Job to Load
+        </button>
 
-        </form>
-      </main>
+        {/* Submit Safety Gate */}
+        <button
+          disabled={!isFormValid}
+          className={`w-full py-4 rounded-xl font-bold uppercase tracking-wider text-sm shadow-xl flex items-center justify-center gap-2 transition-all ${
+            isFormValid
+              ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 cursor-pointer'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+          }`}
+        >
+          {isFormValid ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+          Confirm & Complete Loading Entry →
+        </button>
+
+      </div>
     </div>
   );
 }
