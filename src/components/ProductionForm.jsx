@@ -33,12 +33,12 @@ const RIGGING_SPECS = [
   { id: 'CLAMP', label: 'Heavy Duty Lifting Clamp', type: 'CLAMP', swl: 10000 },
 ];
 
-// Surface Condition Rating Options (Strict English)
+// Surface Condition Rating Options (Clean & Standardized)
 const SURFACE_CONDITION_OPTIONS = [
   { value: 'NONE', label: 'None (Clean)' },
   { value: 'LIGHT', label: 'Light' },
   { value: 'MEDIUM', label: 'Medium' },
-  { value: 'HEAVY', label: 'Heavy (Requires Pre-treatment)' }
+  { value: 'HEAVY', label: 'Heavy' }
 ];
 
 export default function ProductionForm({ currentUser, supabase }) {
