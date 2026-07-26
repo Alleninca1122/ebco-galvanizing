@@ -23,7 +23,7 @@ const RACK_OPTIONS = [
   })
 ];
 
-// [ADD-ONLY]: Rigging Specifications
+// Rigging Specifications (SWL per strand in lbs)
 const RIGGING_SPECS = [
   { id: '14_WIRE', label: '14 Gauge Wire', type: 'WIRE', swl: 50 },
   { id: '12_WIRE', label: '12 Gauge Wire', type: 'WIRE', swl: 75 },
@@ -40,13 +40,6 @@ export default function ProductionForm({ currentUser, supabase }) {
   const [autoLoadId, setAutoLoadId] = useState(''); 
   const [isGeneratingLoadId, setIsGeneratingLoadId] = useState(false);
 
-  // [ADD-ONLY]: Rigging & Hanging Setup State
-  const [hangingPoints, setHangingPoints] = useState('2');
-  const [point1SpecId, setPoint1SpecId] = useState('12_WIRE');
-  const [point1Strands, setPoint1Strands] = useState('');
-  const [point2SpecId, setPoint2SpecId] = useState('12_WIRE');
-  const [point2Strands, setPoint2Strands] = useState('');
-
   // Formatted Current Date & Day of Week
   const currentDateFormatted = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -55,7 +48,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Jobs List - Initialized workpieceType with empty string ''
+  // Jobs List - Initialized workpieceType with empty string '' and per-workpiece rigging settings
   const [jobs, setJobs] = useState([
     {
       id: Date.now(),
@@ -68,7 +61,12 @@ export default function ProductionForm({ currentUser, supabase }) {
           workpieceType: '',
           quantity: '',
           unit: 'pcs',
-          weightLb: ''
+          weightLb: '', // Total Line Weight
+          hangingPoints: '2',
+          point1SpecId: '12_WIRE',
+          point1Strands: '',
+          point2SpecId: '12_WIRE',
+          point2Strands: ''
         }
       ]
     }
@@ -159,7 +157,12 @@ export default function ProductionForm({ currentUser, supabase }) {
             workpieceType: '',
             quantity: '',
             unit: 'pcs',
-            weightLb: ''
+            weightLb: '',
+            hangingPoints: '2',
+            point1SpecId: '12_WIRE',
+            point1Strands: '',
+            point2SpecId: '12_WIRE',
+            point2Strands: ''
           }
         ]
       }
@@ -185,7 +188,12 @@ export default function ProductionForm({ currentUser, supabase }) {
       workpieceType: '',
       quantity: '',
       unit: 'pcs',
-      weightLb: ''
+      weightLb: '',
+      hangingPoints: '2',
+      point1SpecId: '12_WIRE',
+      point1Strands: '',
+      point2SpecId: '12_WIRE',
+      point2Strands: ''
     });
     setJobs(updated);
   };
@@ -203,38 +211,40 @@ export default function ProductionForm({ currentUser, supabase }) {
     return rawShift.toLowerCase().includes('shift') ? rawShift : `${rawShift} Shift`;
   };
 
-  // [ADD-ONLY]: Rigging Logic Calculations
-  const getMaxUnitWeight = () => {
-    let maxSingleWeight = 0;
-    jobs.forEach(job => {
-      job.workpieces.forEach(wp => {
-        const w = parseFloat(wp.weightLb);
-        const q = parseInt(wp.quantity, 10) || 1;
-        if (w > 0) {
-          const unitW = w / q;
-          if (unitW > maxSingleWeight) maxSingleWeight = unitW;
+  // Safety Verification Check Across All Workpieces
+  const checkSafetyDeficiencies = () => {
+    let deficiencies = [];
+    jobs.forEach((job, jIdx) => {
+      job.workpieces.forEach((wp, wIdx) => {
+        const totalW = parseFloat(wp.weightLb) || 0;
+        const qty = parseInt(wp.quantity, 10) || 1;
+        const unitW = totalW / qty;
+        const pts = parseInt(wp.hangingPoints, 10) || 1;
+        const loadPerPt = unitW / pts;
+
+        // Point 1 Check
+        const p1Obj = RIGGING_SPECS.find(r => r.id === wp.point1SpecId) || RIGGING_SPECS[0];
+        const p1Req = Math.max(1, Math.ceil(loadPerPt / p1Obj.swl));
+        const p1User = parseInt(wp.point1Strands, 10) || 0;
+        if (p1Obj.type === 'WIRE' && p1User > 0 && p1User < p1Req) {
+          deficiencies.push(`Job #${jIdx + 1} Line #${wIdx + 1} (${wp.workpieceType || 'Item'}): Point 1 wire count (${p1User}) is lower than recommended (${p1Req}).`);
+        }
+
+        // Point 2 Check
+        if (pts === 2) {
+          const p2Obj = RIGGING_SPECS.find(r => r.id === wp.point2SpecId) || RIGGING_SPECS[0];
+          const p2Req = Math.max(1, Math.ceil(loadPerPt / p2Obj.swl));
+          const p2User = parseInt(wp.point2Strands, 10) || 0;
+          if (p2Obj.type === 'WIRE' && p2User > 0 && p2User < p2Req) {
+            deficiencies.push(`Job #${jIdx + 1} Line #${wIdx + 1} (${wp.workpieceType || 'Item'}): Point 2 wire count (${p2User}) is lower than recommended (${p2Req}).`);
+          }
         }
       });
     });
-    return maxSingleWeight;
+    return deficiencies;
   };
 
-  const maxUnitWeight = getMaxUnitWeight();
-  const pointsCount = parseInt(hangingPoints, 10);
-  const loadPerPoint = maxUnitWeight / pointsCount;
-
-  const p1Obj = RIGGING_SPECS.find(r => r.id === point1SpecId) || RIGGING_SPECS[0];
-  const p2Obj = RIGGING_SPECS.find(r => r.id === point2SpecId) || RIGGING_SPECS[0];
-
-  const p1ReqStrands = Math.max(1, Math.ceil(loadPerPoint / p1Obj.swl));
-  const p2ReqStrands = Math.max(1, Math.ceil(loadPerPoint / p2Obj.swl));
-
-  const p1UserCount = parseInt(point1Strands, 10) || 0;
-  const p2UserCount = parseInt(point2Strands, 10) || 0;
-
-  const isP1Deficient = p1Obj.type === 'WIRE' && p1UserCount > 0 && p1UserCount < p1ReqStrands;
-  const isP2Deficient = pointsCount === 2 && p2Obj.type === 'WIRE' && p2UserCount > 0 && p2UserCount < p2ReqStrands;
-  const isAnyDeficient = isP1Deficient || isP2Deficient;
+  const deficiencies = checkSafetyDeficiencies();
 
   // Submit Handler
   const handleSubmit = async (e) => {
@@ -244,10 +254,11 @@ export default function ProductionForm({ currentUser, supabase }) {
       return;
     }
 
-    // [ADD-ONLY]: Verification prompt when wire strand count is less than reference value
-    if (isAnyDeficient) {
+    if (deficiencies.length > 0) {
       const isConfirmed = window.confirm(
-        `⚠️ WARNING: Tie wire strand count is less than the theoretical reference value.\n\nPlease verify that your entered Weight, Hanging Setup, and Wire Strand counts are accurate.\n\nClick "OK" to acknowledge and proceed, or "Cancel" to modify.`
+        `⚠️ SAFETY WARNING:\n\n` +
+        deficiencies.join('\n') +
+        `\n\nPlease confirm if you want to proceed with these values?`
       );
       if (!isConfirmed) return;
     }
@@ -259,22 +270,29 @@ export default function ProductionForm({ currentUser, supabase }) {
         operatorId: currentUser?.id || 'UNKNOWN',
         shift: getShiftDisplay(),
         entryDate: currentDateFormatted,
-        createdAt: new Date().toISOString(),
-        // [ADD-ONLY]: Rigging Data Attached to Payload
-        hangingPoints: pointsCount,
-        point1: { spec: p1Obj.label, strandsUsed: p1UserCount },
-        point2: pointsCount === 2 ? { spec: p2Obj.label, strandsUsed: p2UserCount } : null
+        createdAt: new Date().toISOString()
       },
       jobs: jobs.map(job => ({
         customerName: job.customerName,
         customerOrderNo: job.customerOrderNo,
         customerBatchNo: job.customerBatchNo || '#1',
-        workpieces: job.workpieces.map(wp => ({
-          workpieceType: wp.workpieceType,
-          quantity: parseInt(wp.quantity, 10) || 0,
-          unit: wp.unit || 'pcs',
-          weightLb: parseInt(wp.weightLb, 10) || 0
-        }))
+        workpieces: job.workpieces.map(wp => {
+          const totalW = parseInt(wp.weightLb, 10) || 0;
+          const qty = parseInt(wp.quantity, 10) || 0;
+          const unitW = qty > 0 ? Math.round(totalW / qty) : 0;
+          return {
+            workpieceType: wp.workpieceType,
+            quantity: qty,
+            unit: wp.unit || 'pcs',
+            totalWeightLb: totalW,
+            unitWeightLb: unitW,
+            rigging: {
+              hangingPoints: parseInt(wp.hangingPoints, 10),
+              point1: { spec: wp.point1SpecId, strands: parseInt(wp.point1Strands, 10) || 0 },
+              point2: wp.hangingPoints === '2' ? { spec: wp.point2SpecId, strands: parseInt(wp.point2Strands, 10) || 0 } : null
+            }
+          };
+        })
       }))
     };
 
@@ -285,8 +303,6 @@ export default function ProductionForm({ currentUser, supabase }) {
     setRackNo('');
     setLoadId('');
     setAutoLoadId('');
-    setPoint1Strands('');
-    setPoint2Strands('');
     setJobs([
       {
         id: Date.now(),
@@ -299,7 +315,12 @@ export default function ProductionForm({ currentUser, supabase }) {
             workpieceType: '',
             quantity: '',
             unit: 'pcs',
-            weightLb: ''
+            weightLb: '',
+            hangingPoints: '2',
+            point1SpecId: '12_WIRE',
+            point1Strands: '',
+            point2SpecId: '12_WIRE',
+            point2Strands: ''
           }
         ]
       }
@@ -331,7 +352,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* [ADD-ONLY]: SOP OPERATING GUIDELINES CARD */}
+        {/* SOP OPERATING GUIDELINES CARD */}
         <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-800/80">
             <span className="text-sm">📋</span>
@@ -340,14 +361,14 @@ export default function ProductionForm({ currentUser, supabase }) {
             </h3>
           </div>
 
-          {/* Dynamic Warning Alert */}
-          {isAnyDeficient && (
+          {/* Dynamic Warning Alert if any line has insufficient wire count */}
+          {deficiencies.length > 0 && (
             <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-lg text-amber-200 text-xs space-y-1">
               <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                ⚠️ NOTICE: Wire count below reference value
+                ⚠️ NOTICE: Wire strand count below reference value
               </div>
               <p className="text-[11px] text-amber-200/90">
-                Please double-check your inputted scale weight, hanging setup, and wire strand counts before submitting.
+                One or more workpiece lines have wire strand counts below the theoretical safety recommendation. Please review item details.
               </p>
             </div>
           )}
@@ -511,7 +532,7 @@ export default function ProductionForm({ currentUser, supabase }) {
               </div>
 
               {/* Dynamic Workpiece Lines */}
-              <div className="pt-2 space-y-3">
+              <div className="pt-2 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     Workpiece Items on this Job
@@ -525,196 +546,209 @@ export default function ProductionForm({ currentUser, supabase }) {
                   </button>
                 </div>
 
-                {job.workpieces.map((wp, wpIndex) => (
-                  <div key={wp.id} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800 relative group">
-                    
-                    {/* Workpiece Type */}
-                    <div className="md:col-span-1">
-                      <label className="block text-[11px] text-slate-400 mb-1">
-                        Workpiece Type <span className="text-rose-400">*</span>
-                      </label>
-                      <select
-                        value={wp.workpieceType}
-                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'workpieceType', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-                        required
-                      >
-                        <option value="">-- Select --</option>
-                        {WORKPIECE_TYPES.map((type) => (
-                          <option key={type} value={type}>{type}</option>
-                        ))}
-                      </select>
-                    </div>
+                {job.workpieces.map((wp, wpIndex) => {
+                  const totalW = parseFloat(wp.weightLb) || 0;
+                  const qty = parseInt(wp.quantity, 10) || 0;
+                  const unitW = qty > 0 && totalW > 0 ? Math.round(totalW / qty) : 0;
 
-                    {/* Quantity Value (No Arrow, Clean Input) */}
-                    <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">
-                        Qty <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={wp.quantity}
-                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'quantity', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        required
-                      />
-                    </div>
+                  return (
+                    <div key={wp.id} className="bg-slate-900/60 p-3.5 rounded-lg border border-slate-800 space-y-3 relative">
+                      
+                      {/* Top Bar: Basic Workpiece Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        {/* Workpiece Type */}
+                        <div className="md:col-span-1">
+                          <label className="block text-[11px] text-slate-400 mb-1">
+                            Workpiece Type <span className="text-rose-400">*</span>
+                          </label>
+                          <select
+                            value={wp.workpieceType}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'workpieceType', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                            required
+                          >
+                            <option value="">-- Select --</option>
+                            {WORKPIECE_TYPES.map((type) => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                    {/* Quantity Unit */}
-                    <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">Unit</label>
-                      <select
-                        value={wp.unit}
-                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'unit', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
-                      >
-                        {QTY_UNITS.map((u) => (
-                          <option key={u.value} value={u.value}>{u.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                        {/* Quantity Value */}
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">
+                            Qty <span className="text-rose-400">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={wp.quantity}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'quantity', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            required
+                          />
+                        </div>
 
-                    {/* Weight (lb) (No Arrow, Clean Input) */}
-                    <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">Weight (lb)</label>
-                      <input
-                        type="number"
-                        value={wp.weightLb}
-                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightLb', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
+                        {/* Quantity Unit */}
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Unit</label>
+                          <select
+                            value={wp.unit}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'unit', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+                          >
+                            {QTY_UNITS.map((u) => (
+                              <option key={u.value} value={u.value}>{u.label}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                    {/* Loading Operator & Remove Button */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <label className="block text-[11px] text-slate-400 mb-1">Operator</label>
-                        <input
-                          type="text"
-                          disabled
-                          value={currentUser?.id || '7222'}
-                          className="w-full bg-slate-900/50 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
-                        />
+                        {/* Total Weight (lb) with Auto Calculated Unit Weight */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-[11px] text-slate-400">Total Weight (lb)</label>
+                            {unitW > 0 && (
+                              <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                                {unitW} lb/pc
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="Total lbs"
+                            value={wp.weightLb}
+                            onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightLb', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+
+                        {/* Loading Operator & Remove Button */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="block text-[11px] text-slate-400 mb-1">Operator</label>
+                            <input
+                              type="text"
+                              disabled
+                              value={currentUser?.id || '7222'}
+                              className="w-full bg-slate-900/50 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
+                            />
+                          </div>
+                          {job.workpieces.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeWorkpieceRow(jobIndex, wpIndex)}
+                              className="mt-4 text-xs text-rose-400 hover:text-rose-300 font-bold px-1"
+                              title="Delete line"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {job.workpieces.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeWorkpieceRow(jobIndex, wpIndex)}
-                          className="mt-4 text-xs text-rose-400 hover:text-rose-300 font-bold px-1"
-                          title="Delete line"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
 
-                  </div>
-                ))}
+                      {/* Bottom Bar: Specific Rigging & Hanging Setup for THIS Workpiece */}
+                      <div className="pt-2.5 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-md space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1">
+                            ⚙️ Hanging & Rigging for {wp.workpieceType || `Line #${wpIndex + 1}`}
+                          </span>
+                          
+                          {/* Single vs Two Points Toggle */}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '1')}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                wp.hangingPoints === '1'
+                                  ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                                  : 'bg-slate-900 border-slate-800 text-slate-500'
+                              }`}
+                            >
+                              📍 1 Point
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '2')}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                wp.hangingPoints === '2'
+                                  ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                                  : 'bg-slate-900 border-slate-800 text-slate-500'
+                              }`}
+                            >
+                              📍📍 2 Points
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Rigging Dropdowns for Point 1 (and Point 2 if active) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          {/* Point 1 Setup */}
+                          <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-0.5">
+                                {wp.hangingPoints === '2' ? 'Point 1 Spec *' : 'Hanging Spec *'}
+                              </label>
+                              <select
+                                value={wp.point1SpecId}
+                                onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point1SpecId', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-100"
+                                required
+                              >
+                                {RIGGING_SPECS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-0.5">Strands / Lines *</label>
+                              <input
+                                type="number"
+                                min="1"
+                                placeholder="e.g. 3"
+                                value={wp.point1Strands}
+                                onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point1Strands', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-mono text-cyan-300 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {/* Point 2 Setup (If Two Points) */}
+                          {wp.hangingPoints === '2' && (
+                            <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-0.5">Point 2 Spec *</label>
+                                <select
+                                  value={wp.point2SpecId}
+                                  onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point2SpecId', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-100"
+                                  required
+                                >
+                                  {RIGGING_SPECS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-slate-400 mb-0.5">Strands / Lines *</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  placeholder="e.g. 3"
+                                  value={wp.point2Strands}
+                                  onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'point2Strands', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-mono text-cyan-300 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
               </div>
 
             </div>
           ))}
-        </div>
-
-        {/* [ADD-ONLY]: OPERATOR RIGGING & HANGING METHOD SECTION */}
-        <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-4">
-          <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-            <span>⚙️</span>
-            <span>OPERATOR RIGGING & HANGING METHOD</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">
-              Hanging Points Count <span className="text-rose-400">*</span>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setHangingPoints('1')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  hangingPoints === '1' 
-                    ? 'bg-slate-900 border-cyan-500 text-cyan-300' 
-                    : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <span>📍</span> Single Point Hanging
-              </button>
-              <button
-                type="button"
-                onClick={() => setHangingPoints('2')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  hangingPoints === '2' 
-                    ? 'bg-slate-900 border-cyan-500 text-cyan-300' 
-                    : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <span>📍📍</span> Two Points Hanging
-              </button>
-            </div>
-          </div>
-
-          <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-3">
-            <span className="text-xs font-bold text-cyan-400 block">
-              {hangingPoints === '2' ? 'Point #1 Rigging Specification' : 'Single Point Rigging Specification'}
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Spec / Type *</label>
-                <select
-                  value={point1SpecId}
-                  onChange={(e) => setPoint1SpecId(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100"
-                  required
-                >
-                  {RIGGING_SPECS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] text-slate-400 mb-1">Actual Strands / Lines Used *</label>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="e.g. 3"
-                  value={point1Strands}
-                  onChange={(e) => setPoint1Strands(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-300 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {hangingPoints === '2' && (
-            <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-3">
-              <span className="text-xs font-bold text-cyan-400 block">Point #2 Rigging Specification</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Spec / Type *</label>
-                  <select
-                    value={point2SpecId}
-                    onChange={(e) => setPoint2SpecId(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100"
-                    required
-                  >
-                    {RIGGING_SPECS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">Actual Strands / Lines Used *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 3"
-                    value={point2Strands}
-                    onChange={(e) => setPoint2Strands(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-cyan-300 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Submit */}
