@@ -3,44 +3,38 @@ import ProductionForm from './components/ProductionForm';
 import NextStepProcessPortal from './components/NextStepProcessPortal';
 
 export default function App() {
-  // 1. Authentication State (Default null to force login)
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('loading'); // 'loading' | 'process'
+  const [activeTab, setActiveTab] = useState('loading');
 
-  // 2. Login Form State
   const [shift, setShift] = useState('Morning');
-  const [empCode, setEmpCode] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [pin, setPin] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Handle Login Event (Dynamically creates session based on entered Code & Shift)
   const handleLogin = (e) => {
     e.preventDefault();
     setLoginError('');
 
-    const trimmedCode = empCode.trim();
-    if (!trimmedCode || !pin) {
-      setLoginError('Please enter both Employee Code and Security PIN.');
+    const trimmedId = employeeId.trim();
+    if (!trimmedId || !pin) {
+      setLoginError('Please enter both Employee ID and Security PIN.');
       return;
     }
 
-    // Role Routing Logic based on entered Code/PIN
     let role = 'OPERATOR_LOADING';
-    if (trimmedCode.toLowerCase().includes('proc') || pin === '8888') {
+    if (trimmedId.toLowerCase().includes('proc') || pin === '8888') {
       role = 'OPERATOR_PROCESS';
     }
 
-    // Dynamic Employee Session Object (No hardcoded demo fallback)
     const userData = {
-      id: trimmedCode.toUpperCase(),
-      name: trimmedCode.toUpperCase(),
+      id: trimmedId.toUpperCase(),
+      name: trimmedId.toUpperCase(),
       role: role,
       shift: shift
     };
 
     setCurrentUser(userData);
 
-    // Auto-navigate based on role
     if (role === 'OPERATOR_PROCESS') {
       setActiveTab('process');
     } else {
@@ -50,13 +44,10 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setEmpCode('');
+    setEmployeeId('');
     setPin('');
   };
 
-  // =================================================================
-  // VIEW 1: Clean English Login Screen
-  // =================================================================
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans text-slate-100">
@@ -102,14 +93,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* Employee Code */}
+            {/* Employee ID - 统一改为 Employee ID */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Employee Code</label>
+              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Employee ID</label>
               <input
                 type="text"
                 placeholder="Enter your Employee ID"
-                value={empCode}
-                onChange={(e) => setEmpCode(e.target.value)}
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-cyan-300 font-mono focus:outline-none focus:border-cyan-500 transition-all"
               />
             </div>
@@ -145,20 +136,14 @@ export default function App() {
     );
   }
 
-  // =================================================================
-  // VIEW 2: Clean English Main Station Dashboard
-  // =================================================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4">
-      
-      {/* Header Bar */}
       <header className="max-w-6xl mx-auto mb-6 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
         <div>
           <h1 className="text-lg font-bold text-white tracking-wide">EBCO Galvanizing System</h1>
           <p className="text-xs text-slate-400">Integrated Shop-Floor Tracking Solution</p>
         </div>
 
-        {/* Tab Switcher */}
         <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
           <button
             onClick={() => setActiveTab('loading')}
@@ -182,7 +167,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* User Info & Logout */}
         <div className="flex items-center gap-3 border-l border-slate-800 pl-4">
           <div className="text-right">
             <span className="text-[11px] text-slate-400 block">{currentUser.shift} Shift</span>
@@ -197,7 +181,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Workspace */}
       <main className="max-w-6xl mx-auto">
         {activeTab === 'loading' ? (
           <ProductionForm currentUser={currentUser} />
