@@ -406,7 +406,7 @@ export default function ProductionForm({ currentUser, supabase }) {
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
               <div className="font-bold text-cyan-400">1. Cavity Venting & Drainage (空腔与排气)</div>
               <p className="text-[11px] text-slate-300">
-                Check hollow/pipe structures. Ensure vent & drain holes are present at opposite ends (min $1/2"$ / 13mm). Drill on site if missing to prevent explosion in $450^\circ\text{C}$ kettle!
+                Check hollow/pipe structures. Ensure vent & drain holes are present at opposite ends (min 1/2" / 13mm). Drill on site if missing to prevent explosion in 450°C kettle!
               </p>
             </div>
 
@@ -422,7 +422,7 @@ export default function ProductionForm({ currentUser, supabase }) {
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
               <div className="font-bold text-cyan-400">3. Hanging Tilt Angle (悬挂角度)</div>
               <p className="text-[11px] text-slate-300">
-                Maintain a <strong>$15^\circ - 30^\circ$ tilt angle</strong> for smooth zinc flow & drainage. Adjust front/rear wire or chain lengths based on attachment point spacing.
+                Maintain a <strong>15° - 30° tilt angle</strong> for smooth zinc flow & drainage. Adjust front/rear wire or chain lengths based on attachment point spacing.
               </p>
             </div>
 
@@ -430,8 +430,8 @@ export default function ProductionForm({ currentUser, supabase }) {
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
               <div className="font-bold text-cyan-400">4. Physical Clearance Limits (深度与净空)</div>
               <p className="text-[11px] text-slate-300">
-                • <strong>Min Top Clearance $\ge 50\text{ cm}$</strong>: Ensures full submersion in tank.<br/>
-                • <strong>Max Hang Depth $\le 400\text{ cm}$</strong>: Prevents bottoming out or overhead crane snagging.
+                • <strong>Min Top Clearance &ge; 50 cm</strong>: Ensures full submersion in tank.<br/>
+                • <strong>Max Hang Depth &le; 400 cm</strong>: Prevents bottoming out or overhead crane snagging.
               </p>
             </div>
           </div>
@@ -730,7 +730,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
                   {/* 5. Top Clearance Check */}
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-300">5. 顶端净空距离是否 $\ge 50\text{ cm}$?</span>
+                    <span className="text-slate-300">5. 顶端净空距离是否 &ge; 50 cm?</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -739,7 +739,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                           job.minTopClearanceValid ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        YES ($\ge 50\text{cm}$)
+                        YES (&ge; 50 cm)
                       </button>
                       <button
                         type="button"
@@ -748,14 +748,14 @@ export default function ProductionForm({ currentUser, supabase }) {
                           !job.minTopClearanceValid ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        NO ($< 50\text{cm}$)
+                        NO (&lt; 50 cm)
                       </button>
                     </div>
                   </div>
 
                   {/* 6. Max Hang Depth Check */}
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-300">6. 最大下垂深度是否 $\le 400\text{ cm}$?</span>
+                    <span className="text-slate-300">6. 最大下垂深度是否 &le; 400 cm?</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -764,7 +764,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                           job.maxHangDepthValid ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        YES ($\le 400\text{cm}$)
+                        YES (&le; 400 cm)
                       </button>
                       <button
                         type="button"
@@ -773,7 +773,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                           !job.maxHangDepthValid ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        NO ($> 400\text{cm}$)
+                        NO (&gt; 400 cm)
                       </button>
                     </div>
                   </div>
