@@ -1,194 +1,89 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import ProductionForm from './components/ProductionForm';
+import NextStepProcessPortal from './components/NextStepProcessPortal';
 import AdminEmployeeManager from './components/AdminEmployeeManager';
-import ForceChangePinModal from './components/ForceChangePinModal';
-import { supabase } from './utils/supabaseClient';
 
 export default function App() {
-  const [currentOperator, setCurrentOperator] = useState(null);
-  const [pinInput, setPinInput] = useState('');
-  const [operators, setOperators] = useState([]);
-  const [selectedOperatorId, setSelectedOperatorId] = useState('');
-  const [showForceChangePin, setShowForceChangePin] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
+  // 1. 模拟登录用户（实际开发中接 Supabase 登录状态）
+  // 岗位 Role 可选: 'OPERATOR_LOADING' | 'OPERATOR_PROCESS' | 'FOREMAN'
+  const [user, setUser] = useState({
+    id: 'OP-101',
+    name: 'John Doe',
+    role: 'OPERATOR_PROCESS' 
+  });
 
-  // 定时器引用：用于无操作自动登出
-  const idleTimerRef = useRef(null);
-
-  // 1. 获取所有激活状态的操作员列表
-  useEffect(() => {
-    fetchOperators();
-  }, []);
-
-  const fetchOperators = async () => {
-    const { data, error } = await supabase
-      .from('operators')
-      .select('*')
-      .eq('is_active', true);
-    if (!error && data) {
-      setOperators(data);
-    }
+  // 2. 根据用户角色初始化默认显示的页面
+  const getDefaultTab = (role) => {
+    if (role === 'OPERATOR_LOADING') return 'loading';
+    return 'process'; // 酸洗/浸锌/卸架工人与班长默认进工序台
   };
 
-  // 2. 无操作自动登出逻辑 (Idle Timeout - 4小时)
-  const resetIdleTimer = () => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    
-    // 如果当前有员工登录，开启 4 小时 (4 * 60 * 60 * 1000 ms) 倒计时
-    if (currentOperator) {
-      idleTimerRef.current = setTimeout(() => {
-        handleLogout('timeout');
-      }, 4 * 60 * 60 * 1000); // 4 小时无操作自动登出
-    }
-  };
-
-  // 监听键盘、鼠标、触摸操作，重置静置倒计时
-  useEffect(() => {
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    const handleUserActivity = () => resetIdleTimer();
-
-    if (currentOperator) {
-      resetIdleTimer();
-      events.forEach((event) => window.addEventListener(event, handleUserActivity));
-    }
-
-    return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      events.forEach((event) => window.removeEventListener(event, handleUserActivity));
-    };
-  }, [currentOperator]);
-
-  // 3. 处理 PIN 登录验证
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    const op = operators.find((o) => o.id === selectedOperatorId);
-    if (!op) {
-      alert('Please select an operator');
-      return;
-    }
-
-    if (op.pin === pinInput) {
-      // 校验成功，记录登录状态
-      setCurrentOperator(op);
-      setPinInput('');
-
-      // 如果使用的仍是初始默认密码 1234，强迫修改 PIN
-      if (op.pin === '1234') {
-        setShowForceChangePin(true);
-      }
-    } else {
-      alert('Incorrect PIN');
-      setPinInput('');
-    }
-  };
-
-  // 4. 登出/注销逻辑 (Logout)
-  const handleLogout = (reason = 'manual') => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    setCurrentOperator(null);
-    setSelectedOperatorId('');
-    setPinInput('');
-    setShowAdmin(false);
-
-    if (reason === 'timeout') {
-      alert('System automatically logged out due to 4 hours of inactivity.');
-    }
-  };
+  const [activeTab, setActiveTab] = useState(getDefaultTab(user.role));
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800">
-      {/* 顶部导航与状态条 */}
-      <header className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shadow-md">
-        <h1 className="text-xl font-bold tracking-wide">EBCO Galvanizing System</h1>
-        
-        {currentOperator && (
-          <div className="flex items-center gap-4">
-            <span className="text-sm bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
-              Operator: <strong className="text-emerald-400">{currentOperator.name}</strong> ({currentOperator.role})
-            </span>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4">
+      {/* 顶部导航控制栏 */}
+      <header className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-slate-800 gap-4">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <h1 className="text-lg font-bold text-cyan-400 font-mono tracking-wide">
+            EBCO Galvanizing System
+          </h1>
+          
+          {/* 页面切换按钮 */}
+          <nav className="flex gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs">
+            <button
+              onClick={() => setActiveTab('loading')}
+              className={`px-3 py-1.5 rounded font-medium transition-all ${
+                activeTab === 'loading' 
+                  ? 'bg-cyan-500 text-slate-950 font-bold' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Step 01: Loading (挂件)
+            </button>
 
-            {/* Admin 管理界面切换按钮 */}
-            {currentOperator.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('process')}
+              className={`px-3 py-1.5 rounded font-medium transition-all ${
+                activeTab === 'process' 
+                  ? 'bg-cyan-500 text-slate-950 font-bold' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Steps 02-04: Process Portal (工序作业台)
+            </button>
+
+            {/* 班长 / 管理员专属菜单 */}
+            {user.role === 'FOREMAN' && (
               <button
-                onClick={() => setShowAdmin(!showAdmin)}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-sm transition"
+                onClick={() => setActiveTab('admin')}
+                className={`px-3 py-1.5 rounded font-medium transition-all ${
+                  activeTab === 'admin' 
+                    ? 'bg-amber-500 text-slate-950 font-bold' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
               >
-                {showAdmin ? 'Back to Form' : 'Employee Mgmt'}
+                Admin (员工管理)
               </button>
             )}
+          </nav>
+        </div>
 
-            {/* 手动登出 / 切换操作员按钮 */}
-            <button
-              onClick={() => handleLogout('manual')}
-              className="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded text-sm font-semibold transition"
-            >
-              Exit / Switch Operator
-            </button>
-          </div>
-        )}
+        {/* 右侧当前操作员信息 */}
+        <div className="text-xs text-right">
+          <span className="text-slate-400 block">Logged in as:</span>
+          <span className="font-mono text-cyan-300 font-bold">
+            👤 {user.name} ({user.role})
+          </span>
+        </div>
       </header>
 
-      {/* 主体界面：未登录时显示锁屏 PIN 输入框 */}
-      {!currentOperator ? (
-        <div className="max-w-md mx-auto mt-20 p-6 bg-white rounded-xl shadow-lg border border-slate-200">
-          <h2 className="text-2xl font-bold text-center mb-6 text-slate-800">Operator Login</h2>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Select Operator</label>
-              <select
-                value={selectedOperatorId}
-                onChange={(e) => setSelectedOperatorId(e.target.value)}
-                className="w-full border p-2.5 rounded-lg bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"
-                required
-              >
-                <option value="">-- Choose Name --</option>
-                {operators.map((op) => (
-                  <option key={op.id} value={op.id}>
-                    {op.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Enter PIN</label>
-              <input
-                type="password"
-                maxLength={4}
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                className="w-full border p-2.5 rounded-lg bg-slate-50 text-center tracking-widest text-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="****"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition"
-            >
-              Login
-            </button>
-          </form>
-        </div>
-      ) : (
-        /* 已登录状态：根据点击显示管理后台或操作表单 */
-        <main className="p-6">
-          {showAdmin && currentOperator.role === 'admin' ? (
-            <AdminEmployeeManager />
-          ) : (
-            <ProductionForm currentOperator={currentOperator} />
-          )}
-        </main>
-      )}
-
-      {/* 第一次登录强制改密码弹窗 */}
-      {showForceChangePin && (
-        <ForceChangePinModal
-          operator={currentOperator}
-          onClose={() => setShowForceChangePin(false)}
-        />
-      )}
+      {/* 动态渲染对应组件 */}
+      <main className="max-w-6xl mx-auto">
+        {activeTab === 'loading' && <ProductionForm currentUser={user} />}
+        {activeTab === 'process' && <NextStepProcessPortal currentUser={user} />}
+        {activeTab === 'admin' && <AdminEmployeeManager />}
+      </main>
     </div>
   );
 }
