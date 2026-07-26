@@ -33,12 +33,23 @@ const RIGGING_SPECS = [
   { id: 'CLAMP', label: 'Heavy Duty Lifting Clamp', type: 'CLAMP', swl: 10000 },
 ];
 
+// Surface Condition Rating Options
+const SURFACE_CONDITION_OPTIONS = [
+  { value: 'NONE', label: 'None (无 / 清洁)' },
+  { value: 'LIGHT', label: 'Light (轻度)' },
+  { value: 'MEDIUM', label: 'Medium (中度)' },
+  { value: 'HEAVY', label: 'Heavy (重度 - 需预处理/脱脂)' }
+];
+
 export default function ProductionForm({ currentUser, supabase }) {
   // Global Rack & Load Session
   const [rackNo, setRackNo] = useState('');
   const [loadId, setLoadId] = useState('');
   const [autoLoadId, setAutoLoadId] = useState(''); 
   const [isGeneratingLoadId, setIsGeneratingLoadId] = useState(false);
+
+  // Sign-off State
+  const [operatorSignoffId, setOperatorSignoffId] = useState('');
 
   // Formatted Current Date & Day of Week
   const currentDateFormatted = new Date().toLocaleDateString('en-US', {
@@ -48,30 +59,41 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Jobs List
-  const [jobs, setJobs] = useState([
-    {
-      id: Date.now(),
-      customerName: '',
-      customerOrderNo: '',
-      customerBatchNo: '',
-      workpieces: [
-        {
-          id: Date.now() + 1,
-          workpieceType: '',
-          quantity: '',
-          unit: 'pcs',
-          weightLb: '', 
-          hangingMode: 'INDIVIDUAL', // 'INDIVIDUAL' or 'STRING'
-          hangingPoints: '2',
-          point1SpecId: '12_WIRE',
-          point1Strands: '',
-          point2SpecId: '12_WIRE',
-          point2Strands: ''
-        }
-      ]
-    }
-  ]);
+  // Initial Job State
+  const createNewJob = () => ({
+    id: Date.now() + Math.random(),
+    customerName: '',
+    customerOrderNo: '',
+    customerBatchNo: '',
+    // Surface Condition Inspection
+    oilPaintLevel: 'NONE',
+    rustLevel: 'NONE',
+    // SOP & Safety Checklist
+    hasEnclosedCavity: false,      // 1. 是否有空腔/管材结构
+    hasAdequateVenting: true,     // 2. 空腔是否有足够排气/泄锌孔
+    drilledOnsite: true,          // 3. 若无，现场是否开足够排气孔
+    isAngleCompliant: true,       // 4. 倾斜角度是否符合要求
+    minTopClearanceValid: true,   // 5. 悬挂最高点到挂钩距离 >= 50cm
+    maxHangDepthValid: true,      // 6. 悬挂最低点到挂钩距离 <= 400cm
+    workpieces: [
+      {
+        id: Date.now() + 1,
+        workpieceType: '',
+        quantity: '',
+        unit: 'pcs',
+        weightLb: '', 
+        hangingMode: 'INDIVIDUAL',
+        hangingPoints: '2',
+        point1SpecId: '12_WIRE',
+        point1Strands: '',
+        point2SpecId: '12_WIRE',
+        point2Strands: ''
+      }
+    ]
+  });
+
+  // Jobs List State
+  const [jobs, setJobs] = useState([createNewJob()]);
 
   const getNextDailySequence = async () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -135,30 +157,7 @@ export default function ProductionForm({ currentUser, supabase }) {
   };
 
   const addJobRow = () => {
-    setJobs([
-      ...jobs,
-      {
-        id: Date.now(),
-        customerName: '',
-        customerOrderNo: '',
-        customerBatchNo: '',
-        workpieces: [
-          {
-            id: Date.now() + 1,
-            workpieceType: '',
-            quantity: '',
-            unit: 'pcs',
-            weightLb: '',
-            hangingMode: 'INDIVIDUAL',
-            hangingPoints: '2',
-            point1SpecId: '12_WIRE',
-            point1Strands: '',
-            point2SpecId: '12_WIRE',
-            point2Strands: ''
-          }
-        ]
-      }
-    ]);
+    setJobs([...jobs, createNewJob()]);
   };
 
   const removeJobRow = (jobIndex) => {
@@ -175,7 +174,7 @@ export default function ProductionForm({ currentUser, supabase }) {
   const addWorkpieceRow = (jobIndex) => {
     const updated = [...jobs];
     updated[jobIndex].workpieces.push({
-      id: Date.now(),
+      id: Date.now() + Math.random(),
       workpieceType: '',
       quantity: '',
       unit: 'pcs',
@@ -202,7 +201,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     return rawShift.toLowerCase().includes('shift') ? rawShift : `${rawShift} Shift`;
   };
 
-  // Safety Verification Check
+  // Wire Strand Safety Check Warnings (Non-blocking warning)
   const checkSafetyDeficiencies = () => {
     let deficiencies = [];
     jobs.forEach((job, jIdx) => {
@@ -212,11 +211,8 @@ export default function ProductionForm({ currentUser, supabase }) {
         const unitW = totalW / qty;
         const pts = parseInt(wp.hangingPoints, 10) || 1;
 
-        // If String Hanging, entire total weight is carried by top rigging points
-        // If Individual Hanging, weight per point is unit weight / points
         const loadPerPt = wp.hangingMode === 'STRING' ? (totalW / pts) : (unitW / pts);
 
-        // Point 1 Check
         const p1Obj = RIGGING_SPECS.find(r => r.id === wp.point1SpecId) || RIGGING_SPECS[0];
         const p1Req = Math.max(1, Math.ceil(loadPerPt / p1Obj.swl));
         const p1User = parseInt(wp.point1Strands, 10) || 0;
@@ -224,7 +220,6 @@ export default function ProductionForm({ currentUser, supabase }) {
           deficiencies.push(`Job #${jIdx + 1} Line #${wIdx + 1} (${wp.workpieceType || 'Item'}): Point 1 wire count (${p1User}) is lower than recommended (${p1Req}).`);
         }
 
-        // Point 2 Check
         if (pts === 2) {
           const p2Obj = RIGGING_SPECS.find(r => r.id === wp.point2SpecId) || RIGGING_SPECS[0];
           const p2Req = Math.max(1, Math.ceil(loadPerPt / p2Obj.swl));
@@ -238,12 +233,44 @@ export default function ProductionForm({ currentUser, supabase }) {
     return deficiencies;
   };
 
+  // Severe Safety Violations Check (Hard Blocking Logic)
+  const checkCriticalSafetyViolations = () => {
+    let severeErrors = [];
+    jobs.forEach((job, jIdx) => {
+      // Check 1: Cavity without venting & without onsite drilling
+      if (job.hasEnclosedCavity && (!job.hasAdequateVenting && !job.drilledOnsite)) {
+        severeErrors.push(`Job #${jIdx + 1}: Enclosed cavity detected without sufficient venting/drainage holes, and not drilled on site! (Explosion Risk in Kettle / 爆锌隐患)`);
+      }
+      // Check 2: Minimum Top Clearance violation (< 50cm)
+      if (!job.minTopClearanceValid) {
+        severeErrors.push(`Job #${jIdx + 1}: Top clearance is less than 50 cm. Material cannot be fully submerged in acid/zinc bath. (无法完全浸没)`);
+      }
+      // Check 3: Maximum Hang Depth violation (> 400cm)
+      if (!job.maxHangDepthValid) {
+        severeErrors.push(`Job #${jIdx + 1}: Total hang depth exceeds 400 cm. Risk of bottom collision or crane overhead snagging. (吊运碰撞/触底风险)`);
+      }
+    });
+    return severeErrors;
+  };
+
   const deficiencies = checkSafetyDeficiencies();
+  const criticalViolations = checkCriticalSafetyViolations();
+  const isFormBlocked = criticalViolations.length > 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!rackNo || !loadId.trim()) {
       alert('Please select a Rack # or Loading Method first.');
+      return;
+    }
+
+    if (isFormBlocked) {
+      alert(`❌ CANNOT SUBMIT DUE TO SEVERE SAFETY VIOLATIONS:\n\n` + criticalViolations.join('\n'));
+      return;
+    }
+
+    if (!operatorSignoffId.trim()) {
+      alert('Please enter your Employee ID (工号) as Confirm & Sign-off before submitting.');
       return;
     }
 
@@ -261,6 +288,7 @@ export default function ProductionForm({ currentUser, supabase }) {
         loadId: loadId.trim(),
         rackNo: rackNo === 'HOOK' ? 'HOOK' : `Rack #${rackNo}`,
         operatorId: currentUser?.id || 'UNKNOWN',
+        signedOffByEmployeeId: operatorSignoffId.trim(),
         shift: getShiftDisplay(),
         entryDate: currentDateFormatted,
         createdAt: new Date().toISOString()
@@ -269,6 +297,18 @@ export default function ProductionForm({ currentUser, supabase }) {
         customerName: job.customerName,
         customerOrderNo: job.customerOrderNo,
         customerBatchNo: job.customerBatchNo || '#1',
+        surfaceAssessment: {
+          oilPaintLevel: job.oilPaintLevel,
+          rustLevel: job.rustLevel
+        },
+        safetyChecklist: {
+          hasEnclosedCavity: job.hasEnclosedCavity,
+          hasAdequateVenting: job.hasAdequateVenting,
+          drilledOnsite: job.drilledOnsite,
+          isAngleCompliant: job.isAngleCompliant,
+          minTopClearanceValid: job.minTopClearanceValid,
+          maxHangDepthValid: job.maxHangDepthValid
+        },
         workpieces: job.workpieces.map(wp => {
           const totalW = parseInt(wp.weightLb, 10) || 0;
           const qty = parseInt(wp.quantity, 10) || 0;
@@ -280,7 +320,7 @@ export default function ProductionForm({ currentUser, supabase }) {
             totalWeightLb: totalW,
             unitWeightLb: unitW,
             rigging: {
-              hangingMode: wp.hangingMode, // 'INDIVIDUAL' or 'STRING'
+              hangingMode: wp.hangingMode,
               hangingPoints: parseInt(wp.hangingPoints, 10),
               point1: { spec: wp.point1SpecId, strands: parseInt(wp.point1Strands, 10) || 0 },
               point2: wp.hangingPoints === '2' ? { spec: wp.point2SpecId, strands: parseInt(wp.point2Strands, 10) || 0 } : null
@@ -291,35 +331,14 @@ export default function ProductionForm({ currentUser, supabase }) {
     };
 
     console.log('Submitting Production Load Payload:', payload);
-    alert(`Load [${loadId.trim()}] recorded successfully!`);
+    alert(`Load [${loadId.trim()}] recorded and signed off by ID [${operatorSignoffId.trim()}] successfully!`);
 
     // Reset Form
     setRackNo('');
     setLoadId('');
     setAutoLoadId('');
-    setJobs([
-      {
-        id: Date.now(),
-        customerName: '',
-        customerOrderNo: '',
-        customerBatchNo: '',
-        workpieces: [
-          {
-            id: Date.now() + 1,
-            workpieceType: '',
-            quantity: '',
-            unit: 'pcs',
-            weightLb: '',
-            hangingMode: 'INDIVIDUAL',
-            hangingPoints: '2',
-            point1SpecId: '12_WIRE',
-            point1Strands: '',
-            point2SpecId: '12_WIRE',
-            point2Strands: ''
-          }
-        ]
-      }
-    ]);
+    setOperatorSignoffId('');
+    setJobs([createNewJob()]);
   };
 
   return (
@@ -346,16 +365,31 @@ export default function ProductionForm({ currentUser, supabase }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* SOP OPERATING GUIDELINES CARD */}
-        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+        {/* SOP OPERATING GUIDELINES CARD (EXPANDED TO 4 STEPS) */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-800/80">
             <span className="text-sm">📋</span>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-              SOP OPERATING GUIDELINES
+              SOP OPERATING GUIDELINES & INSPECTION STANDARDS
             </h3>
           </div>
 
-          {deficiencies.length > 0 && (
+          {/* CRITICAL SAFETY BLOCKING WARNING */}
+          {criticalViolations.length > 0 && (
+            <div className="p-3.5 bg-rose-950/80 border-2 border-rose-600 rounded-lg text-rose-200 text-xs space-y-1.5 animate-pulse">
+              <div className="font-extrabold text-rose-300 text-sm flex items-center gap-2">
+                🚨 CRITICAL SAFETY HAZARD DETECTED - SUBMISSION BLOCKED
+              </div>
+              <ul className="list-disc list-inside text-[11px] space-y-1 text-rose-200">
+                {criticalViolations.map((err, idx) => (
+                  <li key={idx}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* NON-BLOCKING RIGGING STRAND WARNING */}
+          {deficiencies.length > 0 && criticalViolations.length === 0 && (
             <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-lg text-amber-200 text-xs space-y-1">
               <div className="font-bold text-amber-300 flex items-center gap-1.5">
                 ⚠️ NOTICE: Wire strand count below reference value
@@ -366,17 +400,38 @@ export default function ProductionForm({ currentUser, supabase }) {
             </div>
           )}
 
+          {/* 4-STEP SOP REFERENCE GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            {/* Step 1: Venting & Drainage */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-              <div className="font-bold text-slate-200">1. Tie Wire Knotting</div>
-              <p className="text-[11px] text-slate-400">
-                Wrap wire around workpiece body at least <strong>3 full turns</strong>. Do not over-twist knots.
+              <div className="font-bold text-cyan-400">1. Cavity Venting & Drainage (空腔与排气)</div>
+              <p className="text-[11px] text-slate-300">
+                Check hollow/pipe structures. Ensure vent & drain holes are present at opposite ends (min $1/2"$ / 13mm). Drill on site if missing to prevent explosion in $450^\circ\text{C}$ kettle!
               </p>
             </div>
+
+            {/* Step 2: Surface Assessment */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-              <div className="font-bold text-slate-200">2. Drainage & Venting Angle</div>
-              <p className="text-[11px] text-slate-400">
-                Maintain a <strong>15° - 30° tilt angle</strong> for smooth zinc drainage. Ensure vent holes are open on all hollow structures.
+              <div className="font-bold text-cyan-400">2. Surface Condition (油污/漆/锈蚀)</div>
+              <p className="text-[11px] text-slate-300">
+                Inspect oil, paint, and rust levels (None / Light / Medium / Heavy). Record accurately to alert pickling operators for degreasing & acid immersion times.
+              </p>
+            </div>
+
+            {/* Step 3: Hanging Angle */}
+            <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
+              <div className="font-bold text-cyan-400">3. Hanging Tilt Angle (悬挂角度)</div>
+              <p className="text-[11px] text-slate-300">
+                Maintain a <strong>$15^\circ - 30^\circ$ tilt angle</strong> for smooth zinc flow & drainage. Adjust front/rear wire or chain lengths based on attachment point spacing.
+              </p>
+            </div>
+
+            {/* Step 4: Clearance Limits */}
+            <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
+              <div className="font-bold text-cyan-400">4. Physical Clearance Limits (深度与净空)</div>
+              <p className="text-[11px] text-slate-300">
+                • <strong>Min Top Clearance $\ge 50\text{ cm}$</strong>: Ensures full submersion in tank.<br/>
+                • <strong>Max Hang Depth $\le 400\text{ cm}$</strong>: Prevents bottoming out or overhead crane snagging.
               </p>
             </div>
           </div>
@@ -475,6 +530,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                 )}
               </div>
 
+              {/* Basic Job Info */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">
@@ -518,6 +574,210 @@ export default function ProductionForm({ currentUser, supabase }) {
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
                     required
                   />
+                </div>
+              </div>
+
+              {/* Surface Assessment Section for this Job */}
+              <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800/80 space-y-2">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                  🔍 Surface Assessment (油污 & 锈蚀程度)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Oil / Paint Level (油污/油漆等级)</label>
+                    <select
+                      value={job.oilPaintLevel}
+                      onChange={(e) => handleJobFieldChange(jobIndex, 'oilPaintLevel', e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200"
+                    >
+                      {SURFACE_CONDITION_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">Rust Level (锈蚀等级)</label>
+                    <select
+                      value={job.rustLevel}
+                      onChange={(e) => handleJobFieldChange(jobIndex, 'rustLevel', e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200"
+                    >
+                      {SURFACE_CONDITION_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SOP Safety Checklist for this Job */}
+              <div className="bg-slate-900/80 p-3.5 rounded-lg border border-slate-800 space-y-3">
+                <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
+                  🛡️ Job Safety & Submersion Checklist (SOP 检项)
+                </span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  
+                  {/* 1. Cavity Check */}
+                  <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                    <span className="text-slate-300">1. 是否包含空腔/管材结构?</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'hasEnclosedCavity', true)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          job.hasEnclosedCavity ? 'bg-amber-600 text-slate-950' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        YES
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'hasEnclosedCavity', false)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          !job.hasEnclosedCavity ? 'bg-slate-700 text-slate-200' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        NO
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2 & 3. Venting & Drilling (Only relevant if has Cavity) */}
+                  {job.hasEnclosedCavity ? (
+                    <div className="space-y-2 col-span-1 md:col-span-1">
+                      <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                        <span className="text-slate-300">2. 所有空腔是否有足够排气/泄锌孔?</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleJobFieldChange(jobIndex, 'hasAdequateVenting', true)}
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                              job.hasAdequateVenting ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                            }`}
+                          >
+                            YES
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleJobFieldChange(jobIndex, 'hasAdequateVenting', false)}
+                            className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                              !job.hasAdequateVenting ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                            }`}
+                          >
+                            NO
+                          </button>
+                        </div>
+                      </div>
+
+                      {!job.hasAdequateVenting && (
+                        <div className="flex items-center justify-between bg-amber-950/40 p-2.5 rounded border border-amber-800">
+                          <span className="text-amber-200">3. 若无，现场是否已完成补开孔?</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleJobFieldChange(jobIndex, 'drilledOnsite', true)}
+                              className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                                job.drilledOnsite ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                              }`}
+                            >
+                              YES (已开孔)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleJobFieldChange(jobIndex, 'drilledOnsite', false)}
+                              className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                                !job.drilledOnsite ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                              }`}
+                            >
+                              NO (未开孔)
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between bg-slate-950/40 p-2.5 rounded border border-slate-800/50 text-slate-500">
+                      <span>2/3. 排气孔检查</span>
+                      <span className="text-[11px]">N/A (无空腔)</span>
+                    </div>
+                  )}
+
+                  {/* 4. Angle Check */}
+                  <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                    <span className="text-slate-300">4. 倾斜角度是否符合规定 (15°-30°)?</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'isAngleCompliant', true)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          job.isAngleCompliant ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        YES
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'isAngleCompliant', false)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          !job.isAngleCompliant ? 'bg-amber-600 text-white' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        NO
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5. Top Clearance Check */}
+                  <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                    <span className="text-slate-300">5. 顶端净空距离是否 $\ge 50\text{ cm}$?</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'minTopClearanceValid', true)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          job.minTopClearanceValid ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        YES ($\ge 50\text{cm}$)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'minTopClearanceValid', false)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          !job.minTopClearanceValid ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        NO ($< 50\text{cm}$)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 6. Max Hang Depth Check */}
+                  <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                    <span className="text-slate-300">6. 最大下垂深度是否 $\le 400\text{ cm}$?</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'maxHangDepthValid', true)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          job.maxHangDepthValid ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        YES ($\le 400\text{cm}$)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleJobFieldChange(jobIndex, 'maxHangDepthValid', false)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                          !job.maxHangDepthValid ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        NO ($> 400\text{cm}$)
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
@@ -634,14 +894,13 @@ export default function ProductionForm({ currentUser, supabase }) {
                       {/* Rigging & Hanging Setup for THIS Workpiece */}
                       <div className="pt-2.5 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-md space-y-2">
                         
-                        {/* Top Mode Selection: Individual vs String Hanging */}
+                        {/* Top Mode Selection */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-800/60">
                           <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1">
                             ⚙️ Hanging & Rigging for {wp.workpieceType || `Line #${wpIndex + 1}`}
                           </span>
 
                           <div className="flex items-center gap-3">
-                            {/* Hanging Mode Switch */}
                             <div className="inline-flex bg-slate-900 p-0.5 rounded border border-slate-800">
                               <button
                                 type="button"
@@ -667,7 +926,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                               </button>
                             </div>
 
-                            {/* Single vs Two Points Toggle */}
                             <div className="flex gap-1">
                               <button
                                 type="button"
@@ -695,14 +953,12 @@ export default function ProductionForm({ currentUser, supabase }) {
                           </div>
                         </div>
 
-                        {/* String hanging hint message */}
                         {wp.hangingMode === 'STRING' && (
                           <div className="text-[10px] text-amber-300/90 bg-amber-950/40 border border-amber-900/60 px-2 py-1 rounded">
                             💡 <strong>String Mode Active:</strong> All {qty || 'N'} {wp.unit || 'pcs'} are chained together; total weight ({totalW || 0} lbs) is loaded onto the top rigging points.
                           </div>
                         )}
 
-                        {/* Rigging Dropdowns for Point 1 & Point 2 */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                           <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                             <div>
@@ -771,13 +1027,40 @@ export default function ProductionForm({ currentUser, supabase }) {
           ))}
         </div>
 
-        {/* Submit */}
-        <div className="pt-4 border-t border-slate-800">
+        {/* 3. SIGN-OFF & SUBMIT SECTION */}
+        <div className="pt-4 border-t border-slate-800 space-y-4">
+          
+          {/* Employee ID Sign-off Input Box */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <label className="block text-xs font-bold text-slate-200 uppercase">
+              ✍️ Employee Sign-off / 责任人签名 <span className="text-rose-400">*</span>
+            </label>
+            <p className="text-[11px] text-slate-400">
+              请输入你的工号（Employee ID）作为 Confirm & Sign-off 电子签名，表示你已确认以上 SOP 检查与挂具安全均符合标准。
+            </p>
+            <input
+              type="text"
+              placeholder="Enter your Employee ID (工号) e.g. 7222"
+              value={operatorSignoffId}
+              onChange={(e) => setOperatorSignoffId(e.target.value)}
+              className="w-full md:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+              required
+            />
+          </div>
+
+          {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 cursor-pointer transition-all"
+            disabled={isFormBlocked}
+            className={`w-full py-3.5 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all ${
+              isFormBlocked
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20 cursor-pointer'
+            }`}
           >
-            Confirm & Complete Loading Entry →
+            {isFormBlocked
+              ? '🚫 CANNOT SUBMIT: FIX SAFETY HAZARDS ABOVE'
+              : '✍️ Confirm & Sign-off (确认签名并提交) →'}
           </button>
         </div>
 
