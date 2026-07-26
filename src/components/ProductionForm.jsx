@@ -7,11 +7,11 @@ const WORKPIECE_TYPES = [
   'Pole', 'Railing', 'Rebar', 'Rod', 'Tube', 'Washer', 'Others'
 ];
 
-// Quantity Unit Options (Simplified)
+// Quantity Unit Options (Pure English)
 const QTY_UNITS = [
-  { value: 'pcs', label: 'pcs (件)' },
-  { value: 'bag', label: 'bag (袋)' },
-  { value: 'box', label: 'box (箱)' }
+  { value: 'pcs', label: 'pcs' },
+  { value: 'bag', label: 'bag' },
+  { value: 'box', label: 'box' }
 ];
 
 // Hook Option on top, followed by 30 Fixed Racks
@@ -254,7 +254,7 @@ export default function ProductionForm({ currentUser, supabase }) {
           <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
 
-        {/* 右侧：日期与班次 */}
+        {/* Header Right: Date & Shift */}
         <div className="text-right space-y-0.5">
           <div className="text-xs font-semibold text-slate-300">
             📅 {currentDateFormatted}
@@ -445,23 +445,22 @@ export default function ProductionForm({ currentUser, supabase }) {
                       </select>
                     </div>
 
-                    {/* Quantity Value */}
+                    {/* Quantity Value (No Arrow, Clean Input) */}
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">
                         Qty <span className="text-rose-400">*</span>
                       </label>
                       <input
                         type="number"
-                        placeholder="0"
                         min="1"
                         value={wp.quantity}
                         onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'quantity', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         required
                       />
                     </div>
 
-                    {/* Quantity Unit (pcs, bag, box) */}
+                    {/* Quantity Unit */}
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">Unit</label>
                       <select
@@ -475,15 +474,14 @@ export default function ProductionForm({ currentUser, supabase }) {
                       </select>
                     </div>
 
-                    {/* Weight (lb) */}
+                    {/* Weight (lb) (No Arrow, Clean Input) */}
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">Weight (lb)</label>
                       <input
                         type="number"
-                        placeholder="0"
                         value={wp.weightLb}
                         onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightLb', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
 
