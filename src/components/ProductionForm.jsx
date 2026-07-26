@@ -39,10 +39,9 @@ export default function ProductionForm({ currentUser, supabase }) {
    * Fetches the total load count created today to determine the next daily sequence number (1, 2, 3...)
    */
   const getNextDailySequence = async () => {
-    const todayStr = new Date().toISOString().split('T')[0]; // e.g. '2026-07-26'
+    const todayStr = new Date().toISOString().split('T')[0];
 
     if (!supabase) {
-      // Fallback for offline / dev testing
       return Math.floor(Math.random() * 5) + 1;
     }
 
@@ -85,7 +84,7 @@ export default function ProductionForm({ currentUser, supabase }) {
       }
 
       setAutoLoadId(generated);
-      setLoadId(generated); // Sets default generated ID, editable by operator
+      setLoadId(generated);
       setIsGeneratingLoadId(false);
     } else {
       setLoadId('');
@@ -191,18 +190,9 @@ export default function ProductionForm({ currentUser, supabase }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* 1. GLOBAL SECTION: Rack / Hook Selection & Overridable Load ID */}
+        {/* 1. RACK & LOAD ID BOX (Cleaned up header text) */}
         <div className="bg-slate-950 p-5 rounded-xl border border-cyan-800/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
-          
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block">
-              Global Loading Session
-            </span>
-            <span className="text-[11px] text-amber-400/90 font-medium italic">
-              * Select Rack # or Method first
-            </span>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Rack # / Hook Dropdown */}
@@ -216,7 +206,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-cyan-300 font-mono font-bold text-base focus:outline-none focus:border-cyan-400"
                 required
               >
-                <option value="">-- Select Method --</option>
+                <option value="">-- Select Rack # or Method --</option>
                 {RACK_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
