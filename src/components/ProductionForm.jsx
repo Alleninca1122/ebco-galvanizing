@@ -31,15 +31,21 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Job Breakdown List (Supports multi-customer / multi-job loading)
-  const [items, setItems] = useState([
+  // Jobs List: Each Job belongs to a customer and can have MULTIPLE workpiece lines (e.g. Anchor, Pipe, etc.)
+  const [jobs, setJobs] = useState([
     {
       id: Date.now(),
       customerName: '',
+      customerOrderNo: '',
       customerBatchNo: '',
-      workpieceType: '',
-      quantity: '',
-      weightKg: ''
+      workpieces: [
+        {
+          id: Date.now() + 1,
+          workpieceType: 'Anchor',
+          quantity: '',
+          weightKg: ''
+        }
+      ]
     }
   ]);
 
@@ -107,30 +113,61 @@ export default function ProductionForm({ currentUser, supabase }) {
     }
   };
 
-  // Job List Handlers
-  const handleItemChange = (index, field, value) => {
-    const updated = [...items];
-    updated[index][field] = value;
-    setItems(updated);
+  // --- JOB HANDLERS ---
+  const handleJobFieldChange = (jobIndex, field, value) => {
+    const updated = [...jobs];
+    updated[jobIndex][field] = value;
+    setJobs(updated);
   };
 
-  const addItemRow = () => {
-    setItems([
-      ...items,
+  const addJobRow = () => {
+    setJobs([
+      ...jobs,
       {
         id: Date.now(),
         customerName: '',
+        customerOrderNo: '',
         customerBatchNo: '',
-        workpieceType: '',
-        quantity: '',
-        weightKg: ''
+        workpieces: [
+          {
+            id: Date.now() + 1,
+            workpieceType: '',
+            quantity: '',
+            weightKg: ''
+          }
+        ]
       }
     ]);
   };
 
-  const removeItemRow = (index) => {
-    if (items.length === 1) return;
-    setItems(items.filter((_, i) => i !== index));
+  const removeJobRow = (jobIndex) => {
+    if (jobs.length === 1) return;
+    setJobs(jobs.filter((_, i) => i !== jobIndex));
+  };
+
+  // --- WORKPIECE ROW HANDLERS (Inside a Job) ---
+  const handleWorkpieceChange = (jobIndex, wpIndex, field, value) => {
+    const updated = [...jobs];
+    updated[jobIndex].workpieces[wpIndex][field] = value;
+    setJobs(updated);
+  };
+
+  const addWorkpieceRow = (jobIndex) => {
+    const updated = [...jobs];
+    updated[jobIndex].workpieces.push({
+      id: Date.now(),
+      workpieceType: '',
+      quantity: '',
+      weightKg: ''
+    });
+    setJobs(updated);
+  };
+
+  const removeWorkpieceRow = (jobIndex, wpIndex) => {
+    const updated = [...jobs];
+    if (updated[jobIndex].workpieces.length === 1) return;
+    updated[jobIndex].workpieces = updated[jobIndex].workpieces.filter((_, i) => i !== wpIndex);
+    setJobs(updated);
   };
 
   // Format shift label neatly
@@ -156,12 +193,15 @@ export default function ProductionForm({ currentUser, supabase }) {
         entryDate: currentDateFormatted,
         createdAt: new Date().toISOString()
       },
-      jobs: items.map(item => ({
-        customerName: item.customerName,
-        customerBatchNo: item.customerBatchNo,
-        workpieceType: item.workpieceType,
-        quantity: parseInt(item.quantity, 10) || 0,
-        weightKg: parseFloat(item.weightKg) || 0.0
+      jobs: jobs.map(job => ({
+        customerName: job.customerName,
+        customerOrderNo: job.customerOrderNo,
+        customerBatchNo: job.customerBatchNo,
+        workpieces: job.workpieces.map(wp => ({
+          workpieceType: wp.workpieceType,
+          quantity: parseInt(wp.quantity, 10) || 0,
+          weightKg: parseFloat(wp.weightKg) || 0.0
+        }))
       }))
     };
 
@@ -172,14 +212,20 @@ export default function ProductionForm({ currentUser, supabase }) {
     setRackNo('');
     setLoadId('');
     setAutoLoadId('');
-    setItems([
+    setJobs([
       {
         id: Date.now(),
         customerName: '',
+        customerOrderNo: '',
         customerBatchNo: '',
-        workpieceType: '',
-        quantity: '',
-        weightKg: ''
+        workpieces: [
+          {
+            id: Date.now() + 1,
+            workpieceType: '',
+            quantity: '',
+            weightKg: ''
+          }
+        ]
       }
     ]);
   };
@@ -275,47 +321,63 @@ export default function ProductionForm({ currentUser, supabase }) {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Loaded Material Breakdown ({items.length} {items.length === 1 ? 'Job' : 'Jobs'})
+              Loaded Material Breakdown ({jobs.length} {jobs.length === 1 ? 'Job' : 'Jobs'})
             </span>
             <button
               type="button"
-              onClick={addItemRow}
+              onClick={addJobRow}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold rounded-lg border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
             >
               + Add Another Customer Job
             </button>
           </div>
 
-          {items.map((item, index) => (
-            <div key={item.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+          {jobs.map((job, jobIndex) => (
+            <div key={job.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
               
               <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
-                <span className="text-xs font-bold text-slate-400">
-                  Job #{index + 1}
+                <span className="text-xs font-bold text-cyan-400 font-mono uppercase tracking-wider">
+                  Job #{jobIndex + 1}
                 </span>
-                {items.length > 1 && (
+                {jobs.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeItemRow(index)}
+                    onClick={() => removeJobRow(jobIndex)}
                     className="text-xs text-rose-400 hover:text-rose-300 font-bold"
                   >
-                    Remove
+                    Remove Job
                   </button>
                 )}
               </div>
 
-              {/* Customer Name & Customer Batch # */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Customer Name, Customer Order # (6-digit format), Customer Batch # */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">
                     Customer Name <span className="text-rose-400">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. ABC Steel / Ebco Heavy"
-                    value={item.customerName}
-                    onChange={(e) => handleItemChange(index, 'customerName', e.target.value)}
+                    placeholder="e.g. ABC Steel / West Coast Fab"
+                    value={job.customerName}
+                    onChange={(e) => handleJobFieldChange(jobIndex, 'customerName', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Customer Order # <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    pattern="\d*"
+                    maxLength={10}
+                    placeholder="e.g. 102384"
+                    value={job.customerOrderNo}
+                    onChange={(e) => handleJobFieldChange(jobIndex, 'customerOrderNo', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
                     required
                   />
                 </div>
@@ -326,70 +388,99 @@ export default function ProductionForm({ currentUser, supabase }) {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. B-2026-01 / PO-8821"
-                    value={item.customerBatchNo}
-                    onChange={(e) => handleItemChange(index, 'customerBatchNo', e.target.value)}
+                    placeholder="e.g. #5, #12"
+                    value={job.customerBatchNo}
+                    onChange={(e) => handleJobFieldChange(jobIndex, 'customerBatchNo', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
                     required
                   />
                 </div>
               </div>
 
-              {/* Workpiece Type, Quantity, Weight, Loading Operator */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    Workpiece Type <span className="text-rose-400">*</span>
-                  </label>
-                  <select
-                    value={item.workpieceType}
-                    onChange={(e) => handleItemChange(index, 'workpieceType', e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-                    required
+              {/* Dynamic Workpiece Lines (e.g. Anchor, Pipe, Beam) */}
+              <div className="pt-2 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Workpiece Items on this Job
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => addWorkpieceRow(jobIndex)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <option value="">-- Select Type --</option>
-                    {WORKPIECE_TYPES.map((type) => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
+                    + Add Workpiece Line
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    Quantity (Pcs) <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
-                    required
-                  />
-                </div>
+                {job.workpieces.map((wp, wpIndex) => (
+                  <div key={wp.id} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/60 p-3 rounded-lg border border-slate-800 relative group">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Workpiece Type <span className="text-rose-400">*</span>
+                      </label>
+                      <select
+                        value={wp.workpieceType}
+                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'workpieceType', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                        required
+                      >
+                        <option value="">-- Select Type --</option>
+                        {WORKPIECE_TYPES.map((type) => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Weight (kg)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={item.weightKg}
-                    onChange={(e) => handleItemChange(index, 'weightKg', e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Quantity (Pcs) <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        min="1"
+                        value={wp.quantity}
+                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'quantity', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                        required
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Loading Operator</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={currentUser?.id || 'UNKNOWN'}
-                    className="w-full bg-slate-900/50 border border-slate-800/80 rounded-lg px-3 py-2 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Weight (kg)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={wp.weightKg}
+                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightKg', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="block text-[11px] text-slate-400 mb-1">Loading Operator</label>
+                        <input
+                          type="text"
+                          disabled
+                          value={currentUser?.id || '7222'}
+                          className="w-full bg-slate-900/50 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
+                        />
+                      </div>
+                      {job.workpieces.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeWorkpieceRow(jobIndex, wpIndex)}
+                          className="mt-4 text-xs text-rose-400 hover:text-rose-300 font-bold px-1"
+                          title="Delete line"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
 
             </div>
