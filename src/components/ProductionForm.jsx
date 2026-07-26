@@ -38,7 +38,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Jobs List
+  // Jobs List - Initialized workpieceType with empty string ''
   const [jobs, setJobs] = useState([
     {
       id: Date.now(),
@@ -48,7 +48,7 @@ export default function ProductionForm({ currentUser, supabase }) {
       workpieces: [
         {
           id: Date.now() + 1,
-          workpieceType: 'Anchor',
+          workpieceType: '',
           quantity: '',
           unit: 'pcs',
           weightLb: ''
