@@ -31,7 +31,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Item Breakdown List (Supports multi-customer / multi-item loading)
+  // Job Breakdown List (Supports multi-customer / multi-job loading)
   const [items, setItems] = useState([
     {
       id: Date.now(),
@@ -107,7 +107,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     }
   };
 
-  // Item List Handlers
+  // Job List Handlers
   const handleItemChange = (index, field, value) => {
     const updated = [...items];
     updated[index][field] = value;
@@ -133,7 +133,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Format shift label neatly (e.g., "Evening" -> "Evening Shift")
+  // Format shift label neatly
   const getShiftDisplay = () => {
     const rawShift = currentUser?.shift || 'Evening';
     return rawShift.toLowerCase().includes('shift') ? rawShift : `${rawShift} Shift`;
@@ -156,7 +156,7 @@ export default function ProductionForm({ currentUser, supabase }) {
         entryDate: currentDateFormatted,
         createdAt: new Date().toISOString()
       },
-      items: items.map(item => ({
+      jobs: items.map(item => ({
         customerName: item.customerName,
         customerBatchNo: item.customerBatchNo,
         workpieceType: item.workpieceType,
@@ -196,7 +196,7 @@ export default function ProductionForm({ currentUser, supabase }) {
           <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
 
-        {/* 右侧：显示日期、星期几 与 班次 (无 Op ID) */}
+        {/* 右侧：显示日期、星期几 与 班次 */}
         <div className="text-right space-y-0.5">
           <div className="text-xs font-semibold text-slate-300">
             📅 {currentDateFormatted}
@@ -271,18 +271,18 @@ export default function ProductionForm({ currentUser, supabase }) {
           </div>
         </div>
 
-        {/* 2. ITEM BREAKDOWN SECTION */}
+        {/* 2. JOB BREAKDOWN SECTION */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Loaded Material Breakdown ({items.length} {items.length === 1 ? 'item' : 'items'})
+              Loaded Material Breakdown ({items.length} {items.length === 1 ? 'Job' : 'Jobs'})
             </span>
             <button
               type="button"
               onClick={addItemRow}
               className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold rounded-lg border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
             >
-              + Add Another Customer Item
+              + Add Another Customer Job
             </button>
           </div>
 
@@ -291,7 +291,7 @@ export default function ProductionForm({ currentUser, supabase }) {
               
               <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
                 <span className="text-xs font-bold text-slate-400">
-                  Item #{index + 1}
+                  Job #{index + 1}
                 </span>
                 {items.length > 1 && (
                   <button
