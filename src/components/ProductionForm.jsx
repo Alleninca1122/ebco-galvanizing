@@ -33,12 +33,12 @@ const RIGGING_SPECS = [
   { id: 'CLAMP', label: 'Heavy Duty Lifting Clamp', type: 'CLAMP', swl: 10000 },
 ];
 
-// Surface Condition Rating Options
+// Surface Condition Rating Options (Strict English)
 const SURFACE_CONDITION_OPTIONS = [
-  { value: 'NONE', label: 'None (无 / 清洁)' },
-  { value: 'LIGHT', label: 'Light (轻度)' },
-  { value: 'MEDIUM', label: 'Medium (中度)' },
-  { value: 'HEAVY', label: 'Heavy (重度 - 需预处理/脱脂)' }
+  { value: 'NONE', label: 'None (Clean)' },
+  { value: 'LIGHT', label: 'Light' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HEAVY', label: 'Heavy (Requires Pre-treatment)' }
 ];
 
 export default function ProductionForm({ currentUser, supabase }) {
@@ -69,12 +69,12 @@ export default function ProductionForm({ currentUser, supabase }) {
     oilPaintLevel: 'NONE',
     rustLevel: 'NONE',
     // SOP & Safety Checklist
-    hasEnclosedCavity: false,      // 1. 是否有空腔/管材结构
-    hasAdequateVenting: true,     // 2. 空腔是否有足够排气/泄锌孔
-    drilledOnsite: true,          // 3. 若无，现场是否开足够排气孔
-    isAngleCompliant: true,       // 4. 倾斜角度是否符合要求
-    minTopClearanceValid: true,   // 5. 悬挂最高点到挂钩距离 >= 50cm
-    maxHangDepthValid: true,      // 6. 悬挂最低点到挂钩距离 <= 400cm
+    hasEnclosedCavity: false,      // 1. Enclosed cavity/pipe structure
+    hasAdequateVenting: true,     // 2. Adequate venting/drainage holes
+    drilledOnsite: true,          // 3. Drilled on site if missing
+    isAngleCompliant: true,       // 4. Tilt angle 15°-30°
+    minTopClearanceValid: true,   // 5. Min top clearance >= 50cm
+    maxHangDepthValid: true,      // 6. Max hang depth <= 400cm
     workpieces: [
       {
         id: Date.now() + 1,
@@ -239,15 +239,15 @@ export default function ProductionForm({ currentUser, supabase }) {
     jobs.forEach((job, jIdx) => {
       // Check 1: Cavity without venting & without onsite drilling
       if (job.hasEnclosedCavity && (!job.hasAdequateVenting && !job.drilledOnsite)) {
-        severeErrors.push(`Job #${jIdx + 1}: Enclosed cavity detected without sufficient venting/drainage holes, and not drilled on site! (Explosion Risk in Kettle / 爆锌隐患)`);
+        severeErrors.push(`Job #${jIdx + 1}: Enclosed cavity detected without sufficient venting/drainage holes, and not drilled on site! (Explosion Risk in Kettle)`);
       }
       // Check 2: Minimum Top Clearance violation (< 50cm)
       if (!job.minTopClearanceValid) {
-        severeErrors.push(`Job #${jIdx + 1}: Top clearance is less than 50 cm. Material cannot be fully submerged in acid/zinc bath. (无法完全浸没)`);
+        severeErrors.push(`Job #${jIdx + 1}: Top clearance is less than 50 cm. Material cannot be fully submerged in acid/zinc bath.`);
       }
       // Check 3: Maximum Hang Depth violation (> 400cm)
       if (!job.maxHangDepthValid) {
-        severeErrors.push(`Job #${jIdx + 1}: Total hang depth exceeds 400 cm. Risk of bottom collision or crane overhead snagging. (吊运碰撞/触底风险)`);
+        severeErrors.push(`Job #${jIdx + 1}: Total hang depth exceeds 400 cm. Risk of bottom collision or crane overhead snagging.`);
       }
     });
     return severeErrors;
@@ -270,7 +270,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     }
 
     if (!operatorSignoffId.trim()) {
-      alert('Please enter your Employee ID (工号) as Confirm & Sign-off before submitting.');
+      alert('Please enter your Employee ID as Confirm & Sign-off before submitting.');
       return;
     }
 
@@ -365,7 +365,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* SOP OPERATING GUIDELINES CARD (EXPANDED TO 4 STEPS) */}
+        {/* SOP OPERATING GUIDELINES CARD */}
         <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-800/80">
             <span className="text-sm">📋</span>
@@ -404,7 +404,7 @@ export default function ProductionForm({ currentUser, supabase }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             {/* Step 1: Venting & Drainage */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-              <div className="font-bold text-cyan-400">1. Cavity Venting & Drainage (空腔与排气)</div>
+              <div className="font-bold text-cyan-400">1. Cavity Venting & Drainage</div>
               <p className="text-[11px] text-slate-300">
                 Check hollow/pipe structures. Ensure vent & drain holes are present at opposite ends (min 1/2" / 13mm). Drill on site if missing to prevent explosion in 450°C kettle!
               </p>
@@ -412,7 +412,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
             {/* Step 2: Surface Assessment */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-              <div className="font-bold text-cyan-400">2. Surface Condition (油污/漆/锈蚀)</div>
+              <div className="font-bold text-cyan-400">2. Surface Condition Assessment</div>
               <p className="text-[11px] text-slate-300">
                 Inspect oil, paint, and rust levels (None / Light / Medium / Heavy). Record accurately to alert pickling operators for degreasing & acid immersion times.
               </p>
@@ -420,7 +420,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
             {/* Step 3: Hanging Angle */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-              <div className="font-bold text-cyan-400">3. Hanging Tilt Angle (悬挂角度)</div>
+              <div className="font-bold text-cyan-400">3. Hanging Tilt Angle</div>
               <p className="text-[11px] text-slate-300">
                 Maintain a <strong>15° - 30° tilt angle</strong> for smooth zinc flow & drainage. Adjust front/rear wire or chain lengths based on attachment point spacing.
               </p>
@@ -428,7 +428,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
             {/* Step 4: Clearance Limits */}
             <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 space-y-1">
-              <div className="font-bold text-cyan-400">4. Physical Clearance Limits (深度与净空)</div>
+              <div className="font-bold text-cyan-400">4. Physical Clearance Limits</div>
               <p className="text-[11px] text-slate-300">
                 • <strong>Min Top Clearance &ge; 50 cm</strong>: Ensures full submersion in tank.<br/>
                 • <strong>Max Hang Depth &le; 400 cm</strong>: Prevents bottoming out or overhead crane snagging.
@@ -577,14 +577,14 @@ export default function ProductionForm({ currentUser, supabase }) {
                 </div>
               </div>
 
-              {/* Surface Assessment Section for this Job */}
+              {/* Surface Assessment Section */}
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800/80 space-y-2">
                 <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
-                  🔍 Surface Assessment (油污 & 锈蚀程度)
+                  🔍 Surface Assessment (Oil, Paint & Rust Level)
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Oil / Paint Level (油污/油漆等级)</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Oil / Paint Level</label>
                     <select
                       value={job.oilPaintLevel}
                       onChange={(e) => handleJobFieldChange(jobIndex, 'oilPaintLevel', e.target.value)}
@@ -596,7 +596,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">Rust Level (锈蚀等级)</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">Rust Level</label>
                     <select
                       value={job.rustLevel}
                       onChange={(e) => handleJobFieldChange(jobIndex, 'rustLevel', e.target.value)}
@@ -610,17 +610,17 @@ export default function ProductionForm({ currentUser, supabase }) {
                 </div>
               </div>
 
-              {/* SOP Safety Checklist for this Job */}
+              {/* SOP Safety Checklist Section */}
               <div className="bg-slate-900/80 p-3.5 rounded-lg border border-slate-800 space-y-3">
                 <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
-                  🛡️ Job Safety & Submersion Checklist (SOP 检项)
+                  🛡️ Job Safety & Submersion Checklist (SOP Inspection)
                 </span>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   
                   {/* 1. Cavity Check */}
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-300">1. 是否包含空腔/管材结构?</span>
+                    <span className="text-slate-300">1. Has enclosed cavity / hollow structure?</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -643,11 +643,11 @@ export default function ProductionForm({ currentUser, supabase }) {
                     </div>
                   </div>
 
-                  {/* 2 & 3. Venting & Drilling (Only relevant if has Cavity) */}
+                  {/* 2 & 3. Venting & Drilling (Only if Cavity = YES) */}
                   {job.hasEnclosedCavity ? (
                     <div className="space-y-2 col-span-1 md:col-span-1">
                       <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                        <span className="text-slate-300">2. 所有空腔是否有足够排气/泄锌孔?</span>
+                        <span className="text-slate-300">2. All cavities have adequate vent/drain holes?</span>
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -672,7 +672,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
                       {!job.hasAdequateVenting && (
                         <div className="flex items-center justify-between bg-amber-950/40 p-2.5 rounded border border-amber-800">
-                          <span className="text-amber-200">3. 若无，现场是否已完成补开孔?</span>
+                          <span className="text-amber-200">3. If missing, drilled on site?</span>
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -681,7 +681,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                                 job.drilledOnsite ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
                               }`}
                             >
-                              YES (已开孔)
+                              YES (Drilled)
                             </button>
                             <button
                               type="button"
@@ -690,7 +690,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                                 !job.drilledOnsite ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
                               }`}
                             >
-                              NO (未开孔)
+                              NO (Not Drilled)
                             </button>
                           </div>
                         </div>
@@ -698,14 +698,14 @@ export default function ProductionForm({ currentUser, supabase }) {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between bg-slate-950/40 p-2.5 rounded border border-slate-800/50 text-slate-500">
-                      <span>2/3. 排气孔检查</span>
-                      <span className="text-[11px]">N/A (无空腔)</span>
+                      <span>2/3. Venting & Drainage Check</span>
+                      <span className="text-[11px]">N/A (No Cavity)</span>
                     </div>
                   )}
 
                   {/* 4. Angle Check */}
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-300">4. 倾斜角度是否符合规定 (15°-30°)?</span>
+                    <span className="text-slate-300">4. Tilt angle compliant (15°-30°)?</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -730,7 +730,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
                   {/* 5. Top Clearance Check */}
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-300">5. 顶端净空距离是否 &ge; 50 cm?</span>
+                    <span className="text-slate-300">5. Min top clearance &ge; 50 cm?</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -755,7 +755,7 @@ export default function ProductionForm({ currentUser, supabase }) {
 
                   {/* 6. Max Hang Depth Check */}
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-300">6. 最大下垂深度是否 &le; 400 cm?</span>
+                    <span className="text-slate-300">6. Max hang depth &le; 400 cm?</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -922,7 +922,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                                     : 'text-slate-400 hover:text-slate-200'
                                 }`}
                               >
-                                ⛓️ String Hanging (串挂)
+                                ⛓️ String Hanging
                               </button>
                             </div>
 
@@ -1033,14 +1033,14 @@ export default function ProductionForm({ currentUser, supabase }) {
           {/* Employee ID Sign-off Input Box */}
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
             <label className="block text-xs font-bold text-slate-200 uppercase">
-              ✍️ Employee Sign-off / 责任人签名 <span className="text-rose-400">*</span>
+              ✍️ Employee Sign-off / Responsibility Confirmation <span className="text-rose-400">*</span>
             </label>
             <p className="text-[11px] text-slate-400">
-              请输入你的工号（Employee ID）作为 Confirm & Sign-off 电子签名，表示你已确认以上 SOP 检查与挂具安全均符合标准。
+              Please enter your Employee ID as a digital sign-off confirming that all SOP checks and rigging safety requirements have been verified.
             </p>
             <input
               type="text"
-              placeholder="Enter your Employee ID (工号) e.g. 7222"
+              placeholder="Enter your Employee ID (e.g. 7222)"
               value={operatorSignoffId}
               onChange={(e) => setOperatorSignoffId(e.target.value)}
               className="w-full md:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
@@ -1060,7 +1060,7 @@ export default function ProductionForm({ currentUser, supabase }) {
           >
             {isFormBlocked
               ? '🚫 CANNOT SUBMIT: FIX SAFETY HAZARDS ABOVE'
-              : '✍️ Confirm & Sign-off (确认签名并提交) →'}
+              : '✍️ Confirm & Sign-off →'}
           </button>
         </div>
 
