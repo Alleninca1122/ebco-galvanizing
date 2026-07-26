@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 
 // =================================================================
-// 模拟当前车间在制架子（Active Racks）的数据库状态
-// 实际运行中这里通过 Supabase/API 读取
+// Active Shop-Floor Racks Data Structure
 // =================================================================
 const INITIAL_ACTIVE_RACKS = {
   '01': {
@@ -10,14 +9,14 @@ const INITIAL_ACTIVE_RACKS = {
     status: 'IN_PROGRESS',
     loadingData: {
       timestamp: '2026-07-26 08:30',
-      operator: 'John (Loading Worker)',
+      operator: 'EMP-101',
       totalWeight: '3.20',
       items: [
         { customer: 'ABC Steel', batch: 'B-2026-01', material: 'Tube', qty: 15, isRush: true },
         { customer: 'XYZ Metal', batch: 'PO-8821', material: 'Angle', qty: 20, isRush: false }
       ]
     },
-    picklingData: null, // 尚未酸洗 -> 下一步是 Pickling
+    picklingData: null,
     dippingData: null,
     unloadingData: null
   },
@@ -26,7 +25,7 @@ const INITIAL_ACTIVE_RACKS = {
     status: 'IN_PROGRESS',
     loadingData: {
       timestamp: '2026-07-26 09:00',
-      operator: 'Dave (Loading Worker)',
+      operator: 'EMP-105',
       totalWeight: '4.10',
       items: [
         { customer: 'Apex Fab', batch: 'BATCH-99', material: 'Pipe', qty: 50, isRush: false }
@@ -34,27 +33,25 @@ const INITIAL_ACTIVE_RACKS = {
     },
     picklingData: {
       timestamp: '2026-07-26 09:40',
-      operator: 'Mike (Pickler)',
+      operator: 'EMP-202',
       acidTank: 'Acid Tank #2',
       durationMins: '45'
     },
-    dippingData: null, // 酸洗已做，浸锌未做 -> 下一步是 Dipping
+    dippingData: null,
     unloadingData: null
   }
 };
 
 export default function NextStepProcessPortal({ currentUser }) {
-  // 1. 当前登录用户（默认回退参数）
-  const operator = currentUser || { id: 'OP-102', name: 'Mike Ross', role: 'OPERATOR_PROCESS' };
+  // Uses authenticated user session; falls back to empty fields if missing
+  const operator = currentUser || { id: 'UNKNOWN', name: 'UNKNOWN', role: 'OPERATOR_PROCESS' };
 
-  // 2. 状态定义
   const [activeRacks, setActiveRacks] = useState(INITIAL_ACTIVE_RACKS);
   const [inputRackNo, setInputRackNo] = useState('');
   const [selectedRack, setSelectedRack] = useState(null);
-  const [currentAutoStage, setCurrentAutoStage] = useState(''); // 自动决定的工序
+  const [currentAutoStage, setCurrentAutoStage] = useState('');
   const [searchError, setSearchError] = useState('');
 
-  // 3. 表单数据状态
   const [formData, setFormData] = useState({
     acidTank: 'Acid Tank #1',
     soakDurationMins: '40',
@@ -64,9 +61,7 @@ export default function NextStepProcessPortal({ currentUser }) {
     notes: ''
   });
 
-  // -----------------------------------------------------------------
-  // 防呆逻辑：格式化架号输入 (如输入 '1' 或 ' 1 ' 自动规范化为 '01')
-  // -----------------------------------------------------------------
+  // Poka-Yoke Auto Formatting (e.g., "1" -> "01")
   const formatRackInput = (val) => {
     if (!val) return '';
     const clean = val.trim();
@@ -76,22 +71,19 @@ export default function NextStepProcessPortal({ currentUser }) {
     return clean;
   };
 
-  // -----------------------------------------------------------------
-  // 核心逻辑：输入架号后，系统根据数据库记录自动推导“下一步未完成工序”
-  // -----------------------------------------------------------------
+  // Auto-determine next pending stage based on rack history
   const determineNextStage = (rackRecord) => {
     if (!rackRecord.picklingData) {
-      return 'PICKLING'; // Step 02: 酸洗前处理
+      return 'PICKLING';
     } else if (!rackRecord.dippingData) {
-      return 'DIPPING';  // Step 03: 浸锌
+      return 'DIPPING';
     } else if (!rackRecord.unloadingData) {
-      return 'UNLOADING';// Step 04: 卸架与质检
+      return 'UNLOADING';
     } else {
-      return 'COMPLETED';// 已全部完成
+      return 'COMPLETED';
     }
   };
 
-  // 检索架号事件
   const handleSearchRack = (targetRack) => {
     const queryKey = formatRackInput(targetRack || inputRackNo);
     setInputRackNo(queryKey);
@@ -111,11 +103,10 @@ export default function NextStepProcessPortal({ currentUser }) {
     } else {
       setSelectedRack(null);
       setCurrentAutoStage('');
-      setSearchError(`❌ Rack #${queryKey} is not active or empty. (未找到架号 ${queryKey} 或该架当前处于空闲状态)`);
+      setSearchError(`❌ Rack #${queryKey} is not active or empty.`);
     }
   };
 
-  // 提交记录并自动更新流转状态
   const handleSubmitProcess = () => {
     if (!selectedRack || !currentAutoStage) return;
 
@@ -125,7 +116,7 @@ export default function NextStepProcessPortal({ currentUser }) {
     if (currentAutoStage === 'PICKLING') {
       updatedRack.picklingData = {
         timestamp: new Date().toLocaleString(),
-        operator: operator.name,
+        operator: operator.id,
         acidTank: formData.acidTank,
         durationMins: formData.soakDurationMins,
         notes: formData.notes
@@ -133,7 +124,7 @@ export default function NextStepProcessPortal({ currentUser }) {
     } else if (currentAutoStage === 'DIPPING') {
       updatedRack.dippingData = {
         timestamp: new Date().toLocaleString(),
-        operator: operator.name,
+        operator: operator.id,
         zincTemp: formData.zincTemp,
         dipDurationSecs: formData.dipDurationSecs,
         notes: formData.notes
@@ -141,18 +132,17 @@ export default function NextStepProcessPortal({ currentUser }) {
     } else if (currentAutoStage === 'UNLOADING') {
       updatedRack.unloadingData = {
         timestamp: new Date().toLocaleString(),
-        operator: operator.name,
+        operator: operator.id,
         defectQty: formData.defectQty,
         notes: formData.notes
       };
-      updatedRack.status = 'COMPLETED'; // 标记完工释放架子
+      updatedRack.status = 'COMPLETED';
     }
 
     setActiveRacks(prev => ({ ...prev, [rackNo]: updatedRack }));
     
     alert(`✅ Step [${currentAutoStage}] successfully recorded for Rack #${rackNo}!`);
 
-    // 提交后重置，准备输入下一个架号
     setSelectedRack(null);
     setInputRackNo('');
     setFormData({
@@ -168,28 +158,26 @@ export default function NextStepProcessPortal({ currentUser }) {
   return (
     <div className="w-full max-w-6xl mx-auto p-4 bg-slate-900 text-slate-100 rounded-xl shadow-2xl font-sans">
       
-      {/* 顶部 Header：显示系统身份与当前操作员 */}
+      {/* Header */}
       <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-800">
         <div>
           <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest">
             Galvanizing Tracking Protocol
           </span>
-          <h2 className="text-xl font-bold text-white">Execution Station (工序作业台)</h2>
+          <h2 className="text-xl font-bold text-white">Execution Station</h2>
         </div>
         
         <div className="text-right">
-          <span className="text-xs text-slate-400 block">Operator (操作员):</span>
+          <span className="text-xs text-slate-400 block">Operator ID:</span>
           <span className="text-xs font-bold text-cyan-300 font-mono">
-            👤 {operator.name} [{operator.id}]
+            👤 {operator.id}
           </span>
         </div>
       </div>
 
-      {/* 核心架号检索区 (支持下拉选择 + 自动补零输入框) */}
+      {/* Rack Search Area */}
       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* 下拉选择活跃架号 */}
           <div className="flex items-center gap-2">
             <label className="text-xs font-bold text-slate-400 whitespace-nowrap">
               Active Racks:
@@ -215,7 +203,6 @@ export default function NextStepProcessPortal({ currentUser }) {
 
           <span className="text-slate-600 text-xs hidden sm:inline">OR</span>
 
-          {/* 手动输入框 */}
           <div className="flex items-center gap-2">
             <label className="text-xs font-bold text-slate-400 whitespace-nowrap">
               Input #:
@@ -237,27 +224,19 @@ export default function NextStepProcessPortal({ currentUser }) {
             </button>
           </div>
         </div>
-
-        {/* 测试快捷按钮 */}
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span>Demo:</span>
-          <button onClick={() => handleSearchRack('01')} className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded font-mono">#01</button>
-          <button onClick={() => handleSearchRack('05')} className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded font-mono">#05</button>
-        </div>
       </div>
 
-      {/* 错误信息显示 */}
       {searchError && (
         <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-lg text-rose-300 text-sm mb-6">
           {searchError}
         </div>
       )}
 
-      {/* 架号载入成功后的响应式双栏布局 */}
+      {/* Main Layout */}
       {selectedRack && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* 左侧：该架号的前序历史追溯 (7栏) */}
+          {/* Left Panel: Rack Progress History */}
           <div className="lg:col-span-7 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
             <div className="flex justify-between items-center pb-2 border-b border-slate-800 mb-3">
               <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
@@ -268,10 +247,10 @@ export default function NextStepProcessPortal({ currentUser }) {
               </span>
             </div>
 
-            {/* 1. Step 01: 初始挂件明细 */}
+            {/* Step 01 */}
             <div className="mb-3 bg-slate-900 p-3 rounded-lg border border-slate-800/80 text-xs">
               <div className="flex justify-between text-slate-400 mb-2">
-                <span className="font-bold text-slate-200">Step 01: Loading (挂件)</span>
+                <span className="font-bold text-slate-200">Step 01: Loading</span>
                 <span className="font-mono">{selectedRack.loadingData.timestamp}</span>
               </div>
               <div className="space-y-1">
@@ -291,10 +270,10 @@ export default function NextStepProcessPortal({ currentUser }) {
               </div>
             </div>
 
-            {/* 2. Step 02: 酸洗状态 */}
+            {/* Step 02 */}
             <div className="mb-3 bg-slate-900 p-3 rounded-lg border border-slate-800/80 text-xs">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-200">Step 02: Pickling (酸洗前处理)</span>
+                <span className="font-bold text-slate-200">Step 02: Pickling</span>
                 {selectedRack.picklingData ? (
                   <span className="text-emerald-400 font-mono font-bold">✓ PASSED</span>
                 ) : (
@@ -303,15 +282,15 @@ export default function NextStepProcessPortal({ currentUser }) {
               </div>
               {selectedRack.picklingData && (
                 <p className="text-slate-400 mt-1">
-                  Tank: {selectedRack.picklingData.acidTank} | Time: {selectedRack.picklingData.durationMins} mins | By: {selectedRack.picklingData.operator}
+                  Tank: {selectedRack.picklingData.acidTank} | Time: {selectedRack.picklingData.durationMins} mins | Operator: {selectedRack.picklingData.operator}
                 </p>
               )}
             </div>
 
-            {/* 3. Step 03: 浸锌状态 */}
+            {/* Step 03 */}
             <div className="mb-3 bg-slate-900 p-3 rounded-lg border border-slate-800/80 text-xs">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-200">Step 03: Dipping (浸锌)</span>
+                <span className="font-bold text-slate-200">Step 03: Dipping</span>
                 {selectedRack.dippingData ? (
                   <span className="text-emerald-400 font-mono font-bold">✓ PASSED</span>
                 ) : (
@@ -320,15 +299,15 @@ export default function NextStepProcessPortal({ currentUser }) {
               </div>
               {selectedRack.dippingData && (
                 <p className="text-slate-400 mt-1">
-                  Temp: {selectedRack.dippingData.zincTemp}°C | Time: {selectedRack.dippingData.dipDurationSecs}s | By: {selectedRack.dippingData.operator}
+                  Temp: {selectedRack.dippingData.zincTemp}°C | Time: {selectedRack.dippingData.dipDurationSecs}s | Operator: {selectedRack.dippingData.operator}
                 </p>
               )}
             </div>
 
-            {/* 4. Step 04: 卸架与质检 */}
+            {/* Step 04 */}
             <div className="bg-slate-900 p-3 rounded-lg border border-slate-800/80 text-xs">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-200">Step 04: QC & Unloading (卸架质检)</span>
+                <span className="font-bold text-slate-200">Step 04: QC & Unloading</span>
                 {selectedRack.unloadingData ? (
                   <span className="text-emerald-400 font-mono font-bold">✓ COMPLETED</span>
                 ) : (
@@ -339,10 +318,9 @@ export default function NextStepProcessPortal({ currentUser }) {
 
           </div>
 
-          {/* 右侧：自动匹配出的当前待执行表单 (5栏) */}
+          {/* Right Panel: Active Action Form */}
           <div className="lg:col-span-5 bg-slate-950 p-4 rounded-xl border border-cyan-800/80 flex flex-col justify-between">
             <div>
-              
               <div className="pb-3 border-b border-slate-800 mb-4 flex justify-between items-center">
                 <div>
                   <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest block">Action Required</span>
@@ -358,11 +336,10 @@ export default function NextStepProcessPortal({ currentUser }) {
                 </span>
               </div>
 
-              {/* 动态装载对应工序的输入项 */}
               {currentAutoStage === 'PICKLING' && (
                 <div className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-slate-400 mb-1">Acid Tank Selected (选择酸槽):</label>
+                    <label className="block text-slate-400 mb-1">Acid Tank Selected:</label>
                     <select
                       value={formData.acidTank}
                       onChange={(e) => setFormData({ ...formData, acidTank: e.target.value })}
@@ -374,7 +351,7 @@ export default function NextStepProcessPortal({ currentUser }) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Soak Duration in Mins (酸洗时长/分钟):</label>
+                    <label className="block text-slate-400 mb-1">Soak Duration (Mins):</label>
                     <input
                       type="number"
                       value={formData.soakDurationMins}
@@ -388,7 +365,7 @@ export default function NextStepProcessPortal({ currentUser }) {
               {currentAutoStage === 'DIPPING' && (
                 <div className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-slate-400 mb-1">Zinc Kettle Temp (锌锅温度 °C):</label>
+                    <label className="block text-slate-400 mb-1">Zinc Kettle Temp (°C):</label>
                     <input
                       type="number"
                       value={formData.zincTemp}
@@ -397,7 +374,7 @@ export default function NextStepProcessPortal({ currentUser }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Dipping Duration in Secs (浸锌秒数):</label>
+                    <label className="block text-slate-400 mb-1">Dipping Duration (Secs):</label>
                     <input
                       type="number"
                       value={formData.dipDurationSecs}
@@ -415,7 +392,7 @@ export default function NextStepProcessPortal({ currentUser }) {
                     <p className="text-[11px] text-emerald-400/80 mt-1">Submitting will mark Rack #{selectedRack.rackNo} as EMPTY for the next loading cycle.</p>
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Defect / Re-galvanize Pcs (瑕疵/需重镀件数):</label>
+                    <label className="block text-slate-400 mb-1">Defect / Re-galvanize Pcs:</label>
                     <input
                       type="number"
                       value={formData.defectQty}
@@ -428,7 +405,7 @@ export default function NextStepProcessPortal({ currentUser }) {
 
               {currentAutoStage !== 'COMPLETED' && (
                 <div className="mt-3">
-                  <label className="block text-slate-400 text-xs mb-1">Operator Notes (备注):</label>
+                  <label className="block text-slate-400 text-xs mb-1">Operator Notes:</label>
                   <textarea
                     placeholder="Optional notes..."
                     rows="2"
@@ -441,7 +418,6 @@ export default function NextStepProcessPortal({ currentUser }) {
 
             </div>
 
-            {/* 提交按钮 */}
             {currentAutoStage !== 'COMPLETED' ? (
               <div className="pt-4 border-t border-slate-800 mt-4">
                 <button
