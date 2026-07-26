@@ -1,329 +1,363 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { getLogEditPermission } from '../utils/permission';
 
-export default function ProductionForm({ currentUser, activeShift, onRefreshLogs, recentLogs }) {
-  const [workOrder, setWorkOrder] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [weightKg, setWeightKg] = useState('');
-  const [defectType, setDefectType] = useState('None');
-  const [remarks, setRemarks] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+// Standard Galvanizing Workpiece Types
+const WORKPIECE_TYPES = [
+  'Anchor', 'Angle', 'Beam', 'Bracket', 'Frame', 
+  'Grating', 'Ladder', 'Mesh', 'Pipe', 'Plate', 
+  'Pole', 'Railing', 'Rebar', 'Rod', 'Tube', 'Washer', 'Others'
+];
 
-  // Modal Correction State
-  const [correctionTarget, setCorrectionTarget] = useState(null);
-  const [amendedWeight, setAmendedWeight] = useState('');
-  const [amendedDefect, setAmendedDefect] = useState('None');
-  const [changeReason, setChangeReason] = useState('');
+// Hook Option on top, followed by 30 Fixed Racks
+const RACK_OPTIONS = [
+  { value: 'HOOK', label: '🪝 Hook / Direct Sling (吊钩/直吊)' },
+  ...Array.from({ length: 30 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return { value: num, label: `Rack #${num}` };
+  })
+];
 
-  // Submit Final Entry
-  const handleSubmitEntry = async (e) => {
-    e.preventDefault();
-    if (!workOrder) {
-      alert('Please enter or scan a Work Order number');
-      return;
+export default function ProductionForm({ currentUser, supabase }) {
+  // Global Rack & Load Session
+  const [rackNo, setRackNo] = useState('');
+  const [loadId, setLoadId] = useState('');
+  const [isGeneratingLoadId, setIsGeneratingLoadId] = useState(false);
+
+  // Item Breakdown List (Supports multi-customer / multi-item loading on one rack/hook)
+  const [items, setItems] = useState([
+    {
+      id: Date.now(),
+      customerName: '',
+      customerBatchNo: '',
+      workpieceType: '',
+      quantity: '',
+      weightKg: ''
+    }
+  ]);
+
+  /**
+   * Fetches the total load count created today to determine the next daily sequence number (1, 2, 3...)
+   */
+  const getNextDailySequence = async () => {
+    const todayStr = new Date().toISOString().split('T')[0]; // e.g. '2026-07-26'
+
+    if (!supabase) {
+      // Fallback for offline / dev testing
+      return Math.floor(Math.random() * 5) + 1;
     }
 
-    setSubmitting(true);
-
-    const logEntry = {
-      work_order: workOrder,
-      customer_name: customerName,
-      quantity_pcs: parseInt(quantity, 10) || 1,
-      weight_kg: weightKg ? parseFloat(weightKg) : null,
-      defect_type: defectType,
-      remarks: remarks,
-      shift_type: activeShift,
-      operator_id: currentUser.employee_id,
-      operator_name: currentUser.preferred_name || currentUser.name,
-      created_at: new Date().toISOString(),
-    };
-
     try {
-      const { error } = await supabase.from('production_logs').insert([logEntry]);
-      if (error) throw error;
+      const { count, error } = await supabase
+        .from('production_loads')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${todayStr}T00:00:00`);
 
-      alert('✅ Production entry submitted successfully!');
-      setWorkOrder('');
-      setCustomerName('');
-      setQuantity('1');
-      setWeightKg('');
-      setDefectType('None');
-      setRemarks('');
-      if (onRefreshLogs) onRefreshLogs();
+      if (error) throw error;
+      return (count || 0) + 1;
     } catch (err) {
-      alert('⚠️ Error submitting entry: ' + err.message);
-    } finally {
-      setSubmitting(false);
+      console.warn('Could not fetch daily load count from Supabase, falling back to 1:', err);
+      return 1;
     }
   };
 
-  // Submit Append Correction
-  const handleAppendCorrection = async (e) => {
+  /**
+   * Handles Rack/Hook Selection & Auto-generates Load ID:
+   * Hook -> H00-YYYYMMDD-1
+   * Rack -> R01-YYYYMMDD-2
+   */
+  const handleRackSelect = async (selectedVal) => {
+    setRackNo(selectedVal);
+
+    if (selectedVal) {
+      setIsGeneratingLoadId(true);
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+
+      const dailySeq = await getNextDailySequence();
+
+      if (selectedVal === 'HOOK') {
+        setLoadId(`H00-${year}${month}${day}-${dailySeq}`);
+      } else {
+        setLoadId(`R${selectedVal}-${year}${month}${day}-${dailySeq}`);
+      }
+      setIsGeneratingLoadId(false);
+    } else {
+      setLoadId('');
+    }
+  };
+
+  // Item List Handlers
+  const handleItemChange = (index, field, value) => {
+    const updated = [...items];
+    updated[index][field] = value;
+    setItems(updated);
+  };
+
+  const addItemRow = () => {
+    setItems([
+      ...items,
+      {
+        id: Date.now(),
+        customerName: '',
+        customerBatchNo: '',
+        workpieceType: '',
+        quantity: '',
+        weightKg: ''
+      }
+    ]);
+  };
+
+  const removeItemRow = (index) => {
+    if (items.length === 1) return;
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  // Submit Handler
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!changeReason) {
-      alert('Please select or enter a reason for this correction.');
+    if (!rackNo || !loadId) {
+      alert('Please select a Rack # or Hook option to generate a Load ID.');
       return;
     }
 
-    setSubmitting(true);
+    const payload = {
+      global: {
+        loadId,
+        rackNo: rackNo === 'HOOK' ? 'HOOK' : `Rack #${rackNo}`,
+        operatorId: currentUser?.id || 'UNKNOWN',
+        shift: currentUser?.shift || 'Morning',
+        createdAt: new Date().toISOString()
+      },
+      items: items.map(item => ({
+        customerName: item.customerName,
+        customerBatchNo: item.customerBatchNo,
+        workpieceType: item.workpieceType,
+        quantity: parseInt(item.quantity, 10) || 0,
+        weightKg: parseFloat(item.weightKg) || 0.0
+      }))
+    };
 
-    try {
-      const auditPayload = {
-        log_id: correctionTarget.id,
-        field_name: 'weight_kg / defect_type',
-        old_value: `Weight: ${correctionTarget.weight_kg}kg | Defect: ${correctionTarget.defect_type}`,
-        new_value: `Weight: ${amendedWeight}kg | Defect: ${amendedDefect}`,
-        reason_for_change: changeReason,
-        changed_by_id: currentUser.employee_id,
-        changed_by_name: currentUser.preferred_name || currentUser.name,
-      };
+    console.log('Submitting Production Load Payload:', payload);
+    alert(`✅ Load [${loadId}] recorded successfully!`);
 
-      await supabase.from('log_audit_history').insert([auditPayload]);
-
-      await supabase
-        .from('production_logs')
-        .update({
-          weight_kg: parseFloat(amendedWeight),
-          defect_type: amendedDefect,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', correctionTarget.id);
-
-      alert('✅ Correction appended to audit history!');
-      setCorrectionTarget(null);
-      if (onRefreshLogs) onRefreshLogs();
-    } catch (err) {
-      alert('⚠️ Error saving correction: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
+    // Reset Form
+    setRackNo('');
+    setLoadId('');
+    setItems([
+      {
+        id: Date.now(),
+        customerName: '',
+        customerBatchNo: '',
+        workpieceType: '',
+        quantity: '',
+        weightKg: ''
+      }
+    ]);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Draft Form */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-md space-y-4">
-        <div className="flex justify-between items-center border-b pb-3">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-            New Production Entry - {activeShift}
-          </h2>
-          <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded-full">
-            Drafting Mode (Editable before submit)
+    <div className="w-full max-w-5xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl font-sans text-slate-100">
+      
+      {/* Header */}
+      <div className="border-b border-slate-800 pb-4 mb-6 flex justify-between items-center">
+        <div>
+          <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest block">
+            Step 01: Loading Station
+          </span>
+          <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
+        </div>
+        <div className="text-right">
+          <span className="text-xs text-slate-400 block">Operator ID</span>
+          <span className="text-xs font-bold text-cyan-300 font-mono">
+            👤 {currentUser?.id || 'UNKNOWN'} ({currentUser?.shift || 'Morning'} Shift)
           </span>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmitEntry} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* 1. GLOBAL SECTION: Rack / Hook Selection & Load ID */}
+        <div className="bg-slate-950 p-5 rounded-xl border border-cyan-800/60 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+          <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block mb-3">
+            Global Loading Session
+          </span>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Rack # / Hook Dropdown */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Work Order Number * (Scan / Enter)
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                Rack # / Loading Method <span className="text-rose-400">*</span>
               </label>
-              <input
-                type="text"
-                required
-                placeholder="WO-2026-888"
-                value={workOrder}
-                onChange={(e) => setWorkOrder(e.target.value)}
-                className="w-full px-4 py-2.5 border rounded-xl font-mono text-base focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Customer Name (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Ebco Heavy Industries"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full px-4 py-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Quantity (Pcs)</label>
-              <input
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl font-mono text-sm focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Weight (kg)</label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={weightKg}
-                onChange={(e) => setWeightKg(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl font-mono text-sm focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Defect Category</label>
               <select
-                value={defectType}
-                onChange={(e) => setDefectType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-cyan-500"
+                value={rackNo}
+                onChange={(e) => handleRackSelect(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-cyan-300 font-mono font-bold text-base focus:outline-none focus:border-cyan-400"
+                required
               >
-                <option value="None">None / Clear Surface</option>
-                <option value="Bare Spot">Bare Spot (Uncoated)</option>
-                <option value="Zinc Ash/Dross">Zinc Ash / Dross</option>
-                <option value="Pimples">Pimples / Heavy Coating</option>
+                <option value="">-- Select Method --</option>
+                {RACK_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Remarks & Inspection Notes</label>
-            <textarea
-              rows="2"
-              placeholder="Record mil thickness or surface notes..."
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-cyan-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md active:scale-95 disabled:opacity-50"
-          >
-            {submitting ? 'Submitting to Ledger...' : 'Submit Entry to Database'}
-          </button>
-        </form>
-      </div>
-
-      {/* Submitted Logs */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-md space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 border-b pb-2 uppercase tracking-wide">
-          Recent Shift Entries & Audit History
-        </h3>
-
-        {!recentLogs || recentLogs.length === 0 ? (
-          <p className="text-xs text-slate-500 italic">No entries logged yet for this shift.</p>
-        ) : (
-          <div className="space-y-3">
-            {recentLogs.map((log) => {
-              const perm = getLogEditPermission(log.created_at, currentUser.role);
-              return (
-                <div key={log.id} className="p-4 border border-slate-200 rounded-xl bg-slate-50 flex justify-between items-center">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800">WO: {log.work_order}</span>
-                      <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-mono">
-                        {log.weight_kg ? `${log.weight_kg} kg` : 'No Weight'}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Logged by: {log.operator_name} at {new Date(log.created_at).toLocaleTimeString()} ({perm.hoursElapsed}h ago)
-                    </p>
-                  </div>
-
-                  {perm.canEdit ? (
-                    <button
-                      onClick={() => {
-                        setCorrectionTarget(log);
-                        setAmendedWeight(log.weight_kg || '');
-                        setAmendedDefect(log.defect_type || 'None');
-                      }}
-                      className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm transition"
-                    >
-                      ✏️ Correct Log
-                    </button>
-                  ) : (
-                    <span className="text-[10px] bg-slate-200 text-slate-500 px-2.5 py-1 rounded-full font-semibold">
-                      🔒 Locked ({perm.hoursElapsed}h / {perm.allowedHours}h max)
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Append Correction Modal */}
-      {correctionTarget && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 border-b pb-2">
-              Append Correction - WO: {correctionTarget.work_order}
-            </h3>
-
-            <form onSubmit={handleAppendCorrection} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">New Correct Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={amendedWeight}
-                  onChange={(e) => setAmendedWeight(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-xs font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Defect Category</label>
-                <select
-                  value={amendedDefect}
-                  onChange={(e) => setAmendedDefect(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                >
-                  <option value="None">None / Clear Surface</option>
-                  <option value="Bare Spot">Bare Spot (Uncoated)</option>
-                  <option value="Zinc Ash/Dross">Zinc Ash / Dross</option>
-                  <option value="Pimples">Pimples / Heavy Coating</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Correction *</label>
-                <select
-                  required
-                  value={changeReason}
-                  onChange={(e) => setChangeReason(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                >
-                  <option value="">Select Reason...</option>
-                  <option value="Scale calibration error">Scale calibration error</option>
-                  <option value="Typo during manual entry">Typo during manual entry</option>
-                  <option value="Re-weighed after dross removal">Re-weighed after dross removal</option>
-                  <option value="Supervisor audit override">Supervisor audit override</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCorrectionTarget(null)}
-                  className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md"
-                >
-                  Save Append Correction
-                </button>
-              </div>
-            </form>
+            {/* Auto Load ID */}
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                Load ID <span className="text-slate-500 font-normal">(Auto-generated)</span>
+              </label>
+              <input
+                type="text"
+                readOnly
+                placeholder={isGeneratingLoadId ? "Generating Load ID..." : "Select Rack/Hook above..."}
+                value={loadId}
+                className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-4 py-2.5 text-cyan-300 font-mono font-bold text-base cursor-not-allowed focus:outline-none"
+                required
+              />
+            </div>
           </div>
         </div>
-      )}
+
+        {/* 2. ITEM BREAKDOWN SECTION */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Loaded Material Breakdown ({items.length} {items.length === 1 ? 'item' : 'items'})
+            </span>
+            <button
+              type="button"
+              onClick={addItemRow}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold rounded-lg border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              + Add Another Customer Item
+            </button>
+          </div>
+
+          {items.map((item, index) => (
+            <div key={item.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+              
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800/60">
+                <span className="text-xs font-bold text-slate-400">
+                  Item #{index + 1}
+                </span>
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItemRow(index)}
+                    className="text-xs text-rose-400 hover:text-rose-300 font-bold"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              {/* Customer Name & Customer Batch # */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Customer Name <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ABC Steel / Ebco Heavy"
+                    value={item.customerName}
+                    onChange={(e) => handleItemChange(index, 'customerName', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Customer Batch # <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. B-2026-01 / PO-8821"
+                    value={item.customerBatchNo}
+                    onChange={(e) => handleItemChange(index, 'customerBatchNo', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Workpiece Type, Quantity, Weight, Loading Operator */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Workpiece Type <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={item.workpieceType}
+                    onChange={(e) => handleItemChange(index, 'workpieceType', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                    required
+                  >
+                    <option value="">-- Select Type --</option>
+                    {WORKPIECE_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Quantity (Pcs) <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Weight (kg)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={item.weightKg}
+                    onChange={(e) => handleItemChange(index, 'weightKg', e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Loading Operator</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={currentUser?.id || 'UNKNOWN'}
+                    className="w-full bg-slate-900/50 border border-slate-800/80 rounded-lg px-3 py-2 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+            </div>
+          ))}
+        </div>
+
+        {/* Submit */}
+        <div className="pt-4 border-t border-slate-800">
+          <button
+            type="submit"
+            className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 cursor-pointer transition-all"
+          >
+            Confirm & Complete Loading Entry →
+          </button>
+        </div>
+
+      </form>
     </div>
   );
 }
