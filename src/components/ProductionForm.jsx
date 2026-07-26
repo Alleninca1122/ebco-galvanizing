@@ -133,6 +133,12 @@ export default function ProductionForm({ currentUser, supabase }) {
     setItems(items.filter((_, i) => i !== index));
   };
 
+  // Format shift label neatly (e.g., "Evening" -> "Evening Shift")
+  const getShiftDisplay = () => {
+    const rawShift = currentUser?.shift || 'Evening';
+    return rawShift.toLowerCase().includes('shift') ? rawShift : `${rawShift} Shift`;
+  };
+
   // Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -146,7 +152,7 @@ export default function ProductionForm({ currentUser, supabase }) {
         loadId: loadId.trim(),
         rackNo: rackNo === 'HOOK' ? 'HOOK' : `Rack #${rackNo}`,
         operatorId: currentUser?.id || 'UNKNOWN',
-        shift: currentUser?.shift || 'Morning Shift',
+        shift: getShiftDisplay(),
         entryDate: currentDateFormatted,
         createdAt: new Date().toISOString()
       },
@@ -190,13 +196,13 @@ export default function ProductionForm({ currentUser, supabase }) {
           <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
 
-        {/* 右侧：自动显示日期、星期几 与 班次 */}
+        {/* 右侧：显示日期、星期几 与 班次 (无 Op ID) */}
         <div className="text-right space-y-0.5">
           <div className="text-xs font-semibold text-slate-300">
             📅 {currentDateFormatted}
           </div>
           <div className="text-xs font-bold text-cyan-300 font-mono">
-            🕒 {currentUser?.shift || 'Morning Shift'} | Op: {currentUser?.id || 'UNKNOWN'}
+            🕒 {getShiftDisplay()}
           </div>
         </div>
       </div>
