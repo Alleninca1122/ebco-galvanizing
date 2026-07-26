@@ -20,8 +20,16 @@ export default function ProductionForm({ currentUser, supabase }) {
   // Global Rack & Load Session
   const [rackNo, setRackNo] = useState('');
   const [loadId, setLoadId] = useState('');
-  const [autoLoadId, setAutoLoadId] = useState(''); // Stores auto-generated fallback
+  const [autoLoadId, setAutoLoadId] = useState(''); 
   const [isGeneratingLoadId, setIsGeneratingLoadId] = useState(false);
+
+  // Formatted Current Date & Day of Week
+  const currentDateFormatted = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 
   // Item Breakdown List (Supports multi-customer / multi-item loading)
   const [items, setItems] = useState([
@@ -36,7 +44,7 @@ export default function ProductionForm({ currentUser, supabase }) {
   ]);
 
   /**
-   * Fetches the total load count created today to determine the next daily sequence number (1, 2, 3...)
+   * Fetches total load count created today to determine next daily sequence number (1, 2, 3...)
    */
   const getNextDailySequence = async () => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -138,7 +146,8 @@ export default function ProductionForm({ currentUser, supabase }) {
         loadId: loadId.trim(),
         rackNo: rackNo === 'HOOK' ? 'HOOK' : `Rack #${rackNo}`,
         operatorId: currentUser?.id || 'UNKNOWN',
-        shift: currentUser?.shift || 'Morning',
+        shift: currentUser?.shift || 'Morning Shift',
+        entryDate: currentDateFormatted,
         createdAt: new Date().toISOString()
       },
       items: items.map(item => ({
@@ -180,17 +189,21 @@ export default function ProductionForm({ currentUser, supabase }) {
           </span>
           <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
-        <div className="text-right">
-          <span className="text-xs text-slate-400 block">Operator ID</span>
-          <span className="text-xs font-bold text-cyan-300 font-mono">
-            {currentUser?.id || 'UNKNOWN'} ({currentUser?.shift || 'Morning'} Shift)
-          </span>
+
+        {/* 右侧：自动显示日期、星期几 与 班次 */}
+        <div className="text-right space-y-0.5">
+          <div className="text-xs font-semibold text-slate-300">
+            📅 {currentDateFormatted}
+          </div>
+          <div className="text-xs font-bold text-cyan-300 font-mono">
+            🕒 {currentUser?.shift || 'Morning Shift'} | Op: {currentUser?.id || 'UNKNOWN'}
+          </div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* 1. RACK & LOAD ID BOX (Cleaned up header text) */}
+        {/* 1. RACK & LOAD ID BOX */}
         <div className="bg-slate-950 p-5 rounded-xl border border-cyan-800/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
 
