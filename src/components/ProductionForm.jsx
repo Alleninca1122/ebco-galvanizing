@@ -7,6 +7,13 @@ const WORKPIECE_TYPES = [
   'Pole', 'Railing', 'Rebar', 'Rod', 'Tube', 'Washer', 'Others'
 ];
 
+// Quantity Unit Options (Simplified)
+const QTY_UNITS = [
+  { value: 'pcs', label: 'pcs (件)' },
+  { value: 'bag', label: 'bag (袋)' },
+  { value: 'box', label: 'box (箱)' }
+];
+
 // Hook Option on top, followed by 30 Fixed Racks
 const RACK_OPTIONS = [
   { value: 'HOOK', label: '🪝 Hook / Direct Sling (No Rack)' },
@@ -31,7 +38,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Jobs List: Each Job belongs to a customer and can have MULTIPLE workpiece lines (e.g. Anchor, Pipe, etc.)
+  // Jobs List
   const [jobs, setJobs] = useState([
     {
       id: Date.now(),
@@ -43,7 +50,8 @@ export default function ProductionForm({ currentUser, supabase }) {
           id: Date.now() + 1,
           workpieceType: 'Anchor',
           quantity: '',
-          weightKg: ''
+          unit: 'pcs',
+          weightLb: ''
         }
       ]
     }
@@ -133,7 +141,8 @@ export default function ProductionForm({ currentUser, supabase }) {
             id: Date.now() + 1,
             workpieceType: '',
             quantity: '',
-            weightKg: ''
+            unit: 'pcs',
+            weightLb: ''
           }
         ]
       }
@@ -145,7 +154,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     setJobs(jobs.filter((_, i) => i !== jobIndex));
   };
 
-  // --- WORKPIECE ROW HANDLERS (Inside a Job) ---
+  // --- WORKPIECE ROW HANDLERS ---
   const handleWorkpieceChange = (jobIndex, wpIndex, field, value) => {
     const updated = [...jobs];
     updated[jobIndex].workpieces[wpIndex][field] = value;
@@ -158,7 +167,8 @@ export default function ProductionForm({ currentUser, supabase }) {
       id: Date.now(),
       workpieceType: '',
       quantity: '',
-      weightKg: ''
+      unit: 'pcs',
+      weightLb: ''
     });
     setJobs(updated);
   };
@@ -196,11 +206,12 @@ export default function ProductionForm({ currentUser, supabase }) {
       jobs: jobs.map(job => ({
         customerName: job.customerName,
         customerOrderNo: job.customerOrderNo,
-        customerBatchNo: job.customerBatchNo,
+        customerBatchNo: job.customerBatchNo || '#1',
         workpieces: job.workpieces.map(wp => ({
           workpieceType: wp.workpieceType,
           quantity: parseInt(wp.quantity, 10) || 0,
-          weightKg: parseFloat(wp.weightKg) || 0.0
+          unit: wp.unit || 'pcs',
+          weightLb: parseInt(wp.weightLb, 10) || 0
         }))
       }))
     };
@@ -223,7 +234,8 @@ export default function ProductionForm({ currentUser, supabase }) {
             id: Date.now() + 1,
             workpieceType: '',
             quantity: '',
-            weightKg: ''
+            unit: 'pcs',
+            weightLb: ''
           }
         ]
       }
@@ -242,7 +254,7 @@ export default function ProductionForm({ currentUser, supabase }) {
           <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
 
-        {/* 右侧：显示日期、星期几 与 班次 */}
+        {/* 右侧：日期与班次 */}
         <div className="text-right space-y-0.5">
           <div className="text-xs font-semibold text-slate-300">
             📅 {currentDateFormatted}
@@ -350,7 +362,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                 )}
               </div>
 
-              {/* Customer Name, Customer Order # (6-digit format), Customer Batch # */}
+              {/* Customer Name, Customer Order #, Customer Batch # */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">
@@ -394,10 +406,13 @@ export default function ProductionForm({ currentUser, supabase }) {
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-500"
                     required
                   />
+                  <span className="text-[10px] text-slate-500 block mt-1">
+                    If first batch, enter #1.
+                  </span>
                 </div>
               </div>
 
-              {/* Dynamic Workpiece Lines (e.g. Anchor, Pipe, Beam) */}
+              {/* Dynamic Workpiece Lines */}
               <div className="pt-2 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -413,27 +428,30 @@ export default function ProductionForm({ currentUser, supabase }) {
                 </div>
 
                 {job.workpieces.map((wp, wpIndex) => (
-                  <div key={wp.id} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/60 p-3 rounded-lg border border-slate-800 relative group">
-                    <div>
+                  <div key={wp.id} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800 relative group">
+                    
+                    {/* Workpiece Type */}
+                    <div className="md:col-span-1">
                       <label className="block text-[11px] text-slate-400 mb-1">
                         Workpiece Type <span className="text-rose-400">*</span>
                       </label>
                       <select
                         value={wp.workpieceType}
                         onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'workpieceType', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
                         required
                       >
-                        <option value="">-- Select Type --</option>
+                        <option value="">-- Select --</option>
                         {WORKPIECE_TYPES.map((type) => (
                           <option key={type} value={type}>{type}</option>
                         ))}
                       </select>
                     </div>
 
+                    {/* Quantity Value */}
                     <div>
                       <label className="block text-[11px] text-slate-400 mb-1">
-                        Quantity (Pcs) <span className="text-rose-400">*</span>
+                        Qty <span className="text-rose-400">*</span>
                       </label>
                       <input
                         type="number"
@@ -441,31 +459,46 @@ export default function ProductionForm({ currentUser, supabase }) {
                         min="1"
                         value={wp.quantity}
                         onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'quantity', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
                         required
                       />
                     </div>
 
+                    {/* Quantity Unit (pcs, bag, box) */}
                     <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">Weight (kg)</label>
+                      <label className="block text-[11px] text-slate-400 mb-1">Unit</label>
+                      <select
+                        value={wp.unit}
+                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'unit', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 font-mono"
+                      >
+                        {QTY_UNITS.map((u) => (
+                          <option key={u.value} value={u.value}>{u.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Weight (lb) - Clean Integer Input */}
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">Weight (lb)</label>
                       <input
                         type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={wp.weightKg}
-                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightKg', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
+                        placeholder="0"
+                        value={wp.weightLb}
+                        onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'weightLb', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
                       />
                     </div>
 
+                    {/* Loading Operator & Remove Button */}
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
-                        <label className="block text-[11px] text-slate-400 mb-1">Loading Operator</label>
+                        <label className="block text-[11px] text-slate-400 mb-1">Operator</label>
                         <input
                           type="text"
                           disabled
                           value={currentUser?.id || '7222'}
-                          className="w-full bg-slate-900/50 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
+                          className="w-full bg-slate-900/50 border border-slate-800 rounded-lg px-2 py-1.5 text-xs font-mono text-cyan-400 font-bold cursor-not-allowed"
                         />
                       </div>
                       {job.workpieces.length > 1 && (
@@ -479,6 +512,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                         </button>
                       )}
                     </div>
+
                   </div>
                 ))}
               </div>
