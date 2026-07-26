@@ -7,7 +7,7 @@ const WORKPIECE_TYPES = [
   'Pole', 'Railing', 'Rebar', 'Rod', 'Tube', 'Washer', 'Others'
 ];
 
-// Quantity Unit Options (Pure English)
+// Quantity Unit Options
 const QTY_UNITS = [
   { value: 'pcs', label: 'pcs' },
   { value: 'bag', label: 'bag' },
@@ -48,7 +48,7 @@ export default function ProductionForm({ currentUser, supabase }) {
     day: 'numeric'
   });
 
-  // Jobs List - Initialized workpieceType with empty string '' and per-workpiece rigging settings
+  // Jobs List
   const [jobs, setJobs] = useState([
     {
       id: Date.now(),
@@ -61,7 +61,8 @@ export default function ProductionForm({ currentUser, supabase }) {
           workpieceType: '',
           quantity: '',
           unit: 'pcs',
-          weightLb: '', // Total Line Weight
+          weightLb: '', 
+          hangingMode: 'INDIVIDUAL', // 'INDIVIDUAL' or 'STRING'
           hangingPoints: '2',
           point1SpecId: '12_WIRE',
           point1Strands: '',
@@ -72,9 +73,6 @@ export default function ProductionForm({ currentUser, supabase }) {
     }
   ]);
 
-  /**
-   * Fetches total load count created today to determine next daily sequence number (1, 2, 3...)
-   */
   const getNextDailySequence = async () => {
     const todayStr = new Date().toISOString().split('T')[0];
 
@@ -96,11 +94,6 @@ export default function ProductionForm({ currentUser, supabase }) {
     }
   };
 
-  /**
-   * Handles Rack/Hook Selection & Auto-generates Load ID:
-   * Hook -> H00-YYYYMMDD-1
-   * Rack -> R01-YYYYMMDD-2
-   */
   const handleRackSelect = async (selectedVal) => {
     setRackNo(selectedVal);
 
@@ -129,14 +122,12 @@ export default function ProductionForm({ currentUser, supabase }) {
     }
   };
 
-  // Reset Load ID back to auto-generated default
   const handleResetLoadId = () => {
     if (autoLoadId) {
       setLoadId(autoLoadId);
     }
   };
 
-  // --- JOB HANDLERS ---
   const handleJobFieldChange = (jobIndex, field, value) => {
     const updated = [...jobs];
     updated[jobIndex][field] = value;
@@ -158,6 +149,7 @@ export default function ProductionForm({ currentUser, supabase }) {
             quantity: '',
             unit: 'pcs',
             weightLb: '',
+            hangingMode: 'INDIVIDUAL',
             hangingPoints: '2',
             point1SpecId: '12_WIRE',
             point1Strands: '',
@@ -174,7 +166,6 @@ export default function ProductionForm({ currentUser, supabase }) {
     setJobs(jobs.filter((_, i) => i !== jobIndex));
   };
 
-  // --- WORKPIECE ROW HANDLERS ---
   const handleWorkpieceChange = (jobIndex, wpIndex, field, value) => {
     const updated = [...jobs];
     updated[jobIndex].workpieces[wpIndex][field] = value;
@@ -189,6 +180,7 @@ export default function ProductionForm({ currentUser, supabase }) {
       quantity: '',
       unit: 'pcs',
       weightLb: '',
+      hangingMode: 'INDIVIDUAL',
       hangingPoints: '2',
       point1SpecId: '12_WIRE',
       point1Strands: '',
@@ -205,13 +197,12 @@ export default function ProductionForm({ currentUser, supabase }) {
     setJobs(updated);
   };
 
-  // Format shift label neatly
   const getShiftDisplay = () => {
     const rawShift = currentUser?.shift || 'Evening';
     return rawShift.toLowerCase().includes('shift') ? rawShift : `${rawShift} Shift`;
   };
 
-  // Safety Verification Check Across All Workpieces
+  // Safety Verification Check
   const checkSafetyDeficiencies = () => {
     let deficiencies = [];
     jobs.forEach((job, jIdx) => {
@@ -220,7 +211,10 @@ export default function ProductionForm({ currentUser, supabase }) {
         const qty = parseInt(wp.quantity, 10) || 1;
         const unitW = totalW / qty;
         const pts = parseInt(wp.hangingPoints, 10) || 1;
-        const loadPerPt = unitW / pts;
+
+        // If String Hanging, entire total weight is carried by top rigging points
+        // If Individual Hanging, weight per point is unit weight / points
+        const loadPerPt = wp.hangingMode === 'STRING' ? (totalW / pts) : (unitW / pts);
 
         // Point 1 Check
         const p1Obj = RIGGING_SPECS.find(r => r.id === wp.point1SpecId) || RIGGING_SPECS[0];
@@ -246,7 +240,6 @@ export default function ProductionForm({ currentUser, supabase }) {
 
   const deficiencies = checkSafetyDeficiencies();
 
-  // Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!rackNo || !loadId.trim()) {
@@ -287,6 +280,7 @@ export default function ProductionForm({ currentUser, supabase }) {
             totalWeightLb: totalW,
             unitWeightLb: unitW,
             rigging: {
+              hangingMode: wp.hangingMode, // 'INDIVIDUAL' or 'STRING'
               hangingPoints: parseInt(wp.hangingPoints, 10),
               point1: { spec: wp.point1SpecId, strands: parseInt(wp.point1Strands, 10) || 0 },
               point2: wp.hangingPoints === '2' ? { spec: wp.point2SpecId, strands: parseInt(wp.point2Strands, 10) || 0 } : null
@@ -316,6 +310,7 @@ export default function ProductionForm({ currentUser, supabase }) {
             quantity: '',
             unit: 'pcs',
             weightLb: '',
+            hangingMode: 'INDIVIDUAL',
             hangingPoints: '2',
             point1SpecId: '12_WIRE',
             point1Strands: '',
@@ -339,7 +334,6 @@ export default function ProductionForm({ currentUser, supabase }) {
           <h2 className="text-xl font-extrabold text-white">New Load Entry</h2>
         </div>
 
-        {/* Header Right: Date & Shift */}
         <div className="text-right space-y-0.5">
           <div className="text-xs font-semibold text-slate-300">
             📅 {currentDateFormatted}
@@ -361,7 +355,6 @@ export default function ProductionForm({ currentUser, supabase }) {
             </h3>
           </div>
 
-          {/* Dynamic Warning Alert if any line has insufficient wire count */}
           {deficiencies.length > 0 && (
             <div className="p-3 bg-amber-950/70 border border-amber-800 rounded-lg text-amber-200 text-xs space-y-1">
               <div className="font-bold text-amber-300 flex items-center gap-1.5">
@@ -394,7 +387,6 @@ export default function ProductionForm({ currentUser, supabase }) {
           <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Rack # / Hook Dropdown */}
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
                 Rack # / Loading Method <span className="text-rose-400">*</span>
@@ -414,7 +406,6 @@ export default function ProductionForm({ currentUser, supabase }) {
               </select>
             </div>
 
-            {/* Editable Load ID */}
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-xs font-bold text-slate-300 uppercase">
@@ -484,7 +475,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                 )}
               </div>
 
-              {/* Customer Name, Customer Order #, Customer Batch # */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">
@@ -556,7 +546,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                       
                       {/* Top Bar: Basic Workpiece Info */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                        {/* Workpiece Type */}
                         <div className="md:col-span-1">
                           <label className="block text-[11px] text-slate-400 mb-1">
                             Workpiece Type <span className="text-rose-400">*</span>
@@ -574,7 +563,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                           </select>
                         </div>
 
-                        {/* Quantity Value */}
                         <div>
                           <label className="block text-[11px] text-slate-400 mb-1">
                             Qty <span className="text-rose-400">*</span>
@@ -589,7 +577,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                           />
                         </div>
 
-                        {/* Quantity Unit */}
                         <div>
                           <label className="block text-[11px] text-slate-400 mb-1">Unit</label>
                           <select
@@ -603,7 +590,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                           </select>
                         </div>
 
-                        {/* Total Weight (lb) with Auto Calculated Unit Weight */}
                         <div>
                           <div className="flex justify-between items-center mb-1">
                             <label className="block text-[11px] text-slate-400">Total Weight (lb)</label>
@@ -622,7 +608,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                           />
                         </div>
 
-                        {/* Loading Operator & Remove Button */}
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
                             <label className="block text-[11px] text-slate-400 mb-1">Operator</label>
@@ -646,43 +631,79 @@ export default function ProductionForm({ currentUser, supabase }) {
                         </div>
                       </div>
 
-                      {/* Bottom Bar: Specific Rigging & Hanging Setup for THIS Workpiece */}
+                      {/* Rigging & Hanging Setup for THIS Workpiece */}
                       <div className="pt-2.5 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-md space-y-2">
-                        <div className="flex justify-between items-center">
+                        
+                        {/* Top Mode Selection: Individual vs String Hanging */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-800/60">
                           <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1">
                             ⚙️ Hanging & Rigging for {wp.workpieceType || `Line #${wpIndex + 1}`}
                           </span>
-                          
-                          {/* Single vs Two Points Toggle */}
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '1')}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                wp.hangingPoints === '1'
-                                  ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
-                                  : 'bg-slate-900 border-slate-800 text-slate-500'
-                              }`}
-                            >
-                              📍 1 Point
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '2')}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                wp.hangingPoints === '2'
-                                  ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
-                                  : 'bg-slate-900 border-slate-800 text-slate-500'
-                              }`}
-                            >
-                              📍📍 2 Points
-                            </button>
+
+                          <div className="flex items-center gap-3">
+                            {/* Hanging Mode Switch */}
+                            <div className="inline-flex bg-slate-900 p-0.5 rounded border border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingMode', 'INDIVIDUAL')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                  wp.hangingMode !== 'STRING'
+                                    ? 'bg-cyan-600 text-slate-950 shadow'
+                                    : 'text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                🎯 Individual Hanging
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingMode', 'STRING')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+                                  wp.hangingMode === 'STRING'
+                                    ? 'bg-cyan-600 text-slate-950 shadow'
+                                    : 'text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                ⛓️ String Hanging (串挂)
+                              </button>
+                            </div>
+
+                            {/* Single vs Two Points Toggle */}
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '1')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                                  wp.hangingPoints === '1'
+                                    ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                                }`}
+                              >
+                                📍 1 Point
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleWorkpieceChange(jobIndex, wpIndex, 'hangingPoints', '2')}
+                                className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                                  wp.hangingPoints === '2'
+                                    ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                                    : 'bg-slate-900 border-slate-800 text-slate-500'
+                                }`}
+                              >
+                                📍📍 2 Points
+                              </button>
+                            </div>
                           </div>
                         </div>
 
-                        {/* Rigging Dropdowns for Point 1 (and Point 2 if active) */}
+                        {/* String hanging hint message */}
+                        {wp.hangingMode === 'STRING' && (
+                          <div className="text-[10px] text-amber-300/90 bg-amber-950/40 border border-amber-900/60 px-2 py-1 rounded">
+                            💡 <strong>String Mode Active:</strong> All {qty || 'N'} {wp.unit || 'pcs'} are chained together; total weight ({totalW || 0} lbs) is loaded onto the top rigging points.
+                          </div>
+                        )}
+
+                        {/* Rigging Dropdowns for Point 1 & Point 2 */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                          {/* Point 1 Setup */}
                           <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                             <div>
                               <label className="block text-[10px] text-slate-400 mb-0.5">
@@ -711,7 +732,6 @@ export default function ProductionForm({ currentUser, supabase }) {
                             </div>
                           </div>
 
-                          {/* Point 2 Setup (If Two Points) */}
                           {wp.hangingPoints === '2' && (
                             <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                               <div>
