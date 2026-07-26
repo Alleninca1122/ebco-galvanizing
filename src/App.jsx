@@ -60,7 +60,7 @@ export default function App() {
               EBCO Galvanizing Operations
             </span>
             <h1 className="text-2xl font-extrabold text-white">Shop-Floor Portal</h1>
-            <p className="text-xs text-slate-400 mt-1">Sign in to manage rack processing</p>
+            <p className="text-xs text-slate-400 mt-1">Sign in to start your shift</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
