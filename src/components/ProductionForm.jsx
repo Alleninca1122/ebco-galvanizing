@@ -792,21 +792,22 @@ export default function ProductionForm({ currentUser, supabase }) {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
+                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', false)}
                         className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                          job.maxHangDepthValid ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                          !job.hasTightContact ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        YES
+                        NO (Clearance OK)
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', false)}
+
+                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
                         className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                          !job.maxHangDepthValid ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                          !job.hasTightContact ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        NO
+                        YES
                       </button>
                     </div>
                   </div>
