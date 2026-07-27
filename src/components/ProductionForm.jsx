@@ -618,7 +618,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                 </div>
               </div>
 
-              {/* SOP Safety Checklist Section */}
+{/* SOP Safety Checklist Section */}
               <div className="bg-slate-900/80 p-3.5 rounded-lg border border-slate-800 space-y-3">
                 <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
                   🛡️ Job Safety & Submersion Checklist (SOP Inspection)
@@ -786,33 +786,48 @@ export default function ProductionForm({ currentUser, supabase }) {
                     </div>
                   </div>
 
+                  {/* 7. Anti-Galvanizing Masking Agent Check */}
+                  <div className="col-span-1 md:col-span-1 space-y-2">
+                    <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                      <span className="text-slate-300">7. Coated with Masking Agent?</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleJobFieldChange(jobIndex, 'hasMaskingAgent', true)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                            job.hasMaskingAgent ? 'bg-amber-600 text-slate-950' : 'bg-slate-900 text-slate-400'
+                          }`}
+                        >
+                          YES
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleJobFieldChange(jobIndex, 'hasMaskingAgent', false)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                            !job.hasMaskingAgent ? 'bg-slate-700 text-slate-200' : 'bg-slate-900 text-slate-400'
+                          }`}
+                        >
+                          NO
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Racking Direction Notice Card */}
+                    {job.hasMaskingAgent && (
+                      <div className="bg-amber-950/40 border border-amber-600/50 rounded p-2.5 text-xs text-amber-200 flex items-start gap-2">
+                        <span className="text-amber-400 font-bold">⚠️ SOP Notice:</span>
+                        <div>
+                          <p className="font-semibold">Position masked areas at the BOTTOM or SIDES during racking.</p>
+                          <p className="text-[11px] text-amber-300/80 mt-0.5">
+                            Prevent pre-treatment runoff from dripping onto unmasked steel surfaces.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               </div>
-{/* 7. Anti-Galvanizing Masking Agent Check */}
-<div className="space-y-2 col-span-1 md:col-span-2">
-  <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
-    <span className="text-slate-300">7. Coated with Masking / Stop-off Agent?</span>
-    <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={() => handleJobFieldChange(jobIndex, 'hasMaskingAgent', true)}
-        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-          job.hasMaskingAgent ? 'bg-amber-600 text-slate-950' : 'bg-slate-900 text-slate-400'
-        }`}
-      >
-        YES
-      </button>
-      <button
-        type="button"
-        onClick={() => handleJobFieldChange(jobIndex, 'hasMaskingAgent', false)}
-        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-          !job.hasMaskingAgent ? 'bg-slate-700 text-slate-200' : 'bg-slate-900 text-slate-400'
-        }`}
-      >
-        NO
-      </button>
-    </div>
-  </div>
 
   {/* Racking Direction Notice Card */}
   {job.hasMaskingAgent && (
