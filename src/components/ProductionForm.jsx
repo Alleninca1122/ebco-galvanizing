@@ -68,8 +68,8 @@ export default function ProductionForm({ currentUser, supabase }) {
     customerOrderNo: '',
     customerBatchNo: '',
     // Surface Condition Inspection
-    oilPaintLevel: 'NONE',
-    rustLevel: 'NONE',
+    oilPaintLevel: '',
+    rustLevel: '',
     // SOP & Safety Checklist
     hasEnclosedCavity: false,      // 1. Enclosed cavity/pipe structure
     hasAdequateVenting: true,     // 2. Adequate venting/drainage holes
