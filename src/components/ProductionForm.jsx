@@ -797,18 +797,19 @@ export default function ProductionForm({ currentUser, supabase }) {
                           job.hasTightContact === false ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
-                        NO (Clearance OK)
+                        NO
                       </button>
-
-                      {/* YES 按钮：只有当 hasTightContact === true 时高亮红色 */}
+                     {/* YES 按钮：点击前是 YES，点击后变红并显示 YES (Action Required) */}
                       <button
                         type="button"
                         onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
-                        className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                          job.hasTightContact === true ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                        className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                          job.hasTightContact === true
+                            ? 'bg-rose-600 text-white' 
+                            : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
                         }`}
                       >
-                        YES
+                        {job.hasTightContact === true ? 'YES (Action Required)' : 'YES'}
                       </button>
                     </div>
                   </div>
