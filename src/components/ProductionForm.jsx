@@ -790,20 +790,22 @@ export default function ProductionForm({ currentUser, supabase }) {
                   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
                     <span className="text-slate-300">7. Tight contact between workpieces?</span>
                     <div className="flex gap-2">
-                      <button
+                     <button
                         type="button"
-                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
+                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', false)}
                         className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                          !job.hasTightContact ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                          job.hasTightContact === false ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
                         NO (Clearance OK)
                       </button>
+
+                      {/* YES 按钮：只有当 hasTightContact === true 时高亮红色 */}
                       <button
                         type="button"
-                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', false)}
+                        onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
                         className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                          !job.hasTightContact ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
+                          job.hasTightContact === true ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400'
                         }`}
                       >
                         YES
