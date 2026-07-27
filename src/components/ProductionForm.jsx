@@ -16,359 +16,227 @@ const QTY_UNITS = [
 
 // Hook Option on top, followed by 30 Fixed Racks
 const RACK_OPTIONS = [
-  { id: 'HOOK', label: '🪝 Hook (Direct / Hoist)' },
+  { id: 'HOOK', label: '🪝 HOOK (Standard Hook)' },
   ...Array.from({ length: 30 }, (_, i) => ({
     id: `RACK_${i + 1}`,
-    label: `Rack #${i + 1}`
+    label: `🧺 RACK ${i + 1}`
   }))
 ];
 
-// Rigging Specs
+// Preset Rigging Wire Specifications
 const RIGGING_SPECS = [
-  { id: 'WIRE_16', label: '#16 Wire' },
-  { id: 'WIRE_14', label: '#14 Wire' },
-  { id: 'WIRE_12', label: '#12 Wire' },
-  { id: 'WIRE_10', label: '#10 Wire' },
-  { id: 'CHAIN_3_8', label: '3/8" Chain' },
-  { id: 'CHAIN_1_2', label: '1/2" Chain' }
+  { id: 'WIRE_14', label: '14# Wire (Light)' },
+  { id: 'WIRE_12', label: '12# Wire (Standard)' },
+  { id: 'WIRE_10', label: '10# Wire (Heavy)' },
+  { id: 'CHAIN_QUICK', label: 'Chain + Quick Link' }
 ];
 
-// Initial State Templates
-const createInitialWorkpiece = () => ({
-  id: Date.now() + Math.random(),
-  workpieceType: '',
-  quantity: 1,
-  unit: 'pcs',
-  weightLb: '',
-  hangingMode: 'INDIVIDUAL', // INDIVIDUAL | STRING
-  hangingPoints: '1',      // '1' | '2'
-  point1SpecId: 'WIRE_14',
-  point1Strands: 1,
-  point2SpecId: 'WIRE_14',
-  point2Strands: 1
-});
-
-const createInitialJob = () => ({
-  id: Date.now() + Math.random(),
-  customerName: '',
-  jobNumber: '',
-  workpieces: [createInitialWorkpiece()]
-});
-
-export default function GalvanizingForm({ currentUser }) {
-  // --- Form State ---
-  const [rackId, setRackId] = useState('');
-  const [loadId, setLoadId] = useState('');
-  
-  // Surface / Preparation Checks
-  const [hasPaintOrVarnish, setHasPaintOrVarnish] = useState('NO');
-  const [hasHeavyRust, setHasHeavyRust] = useState('NO');
-  const [hasOilOrGrease, setHasOilOrGrease] = useState('NO');
-
-  // SOP Safety Checklist
-  const [sopVentHoles, setSopVentHoles] = useState(false);
-  const [sopDrainHoles, setSopDrainHoles] = useState(false);
-  const [sopEnclosedCavity, setSopEnclosedCavity] = useState(false);
-  const [sopRiggingSecure, setSopRiggingSecure] = useState(false);
-
-  // Customer Jobs & Workpieces
-  const [jobs, setJobs] = useState([createInitialJob()]);
-
-  // Operator Sign-off
+export default function GalvanizingWorksheet({ currentUser, onSubmit }) {
+  // Form Level States
   const [operatorSignoffId, setOperatorSignoffId] = useState('');
+  const [isFormBlocked, setIsFormBlocked] = useState(false);
 
-  // --- Handlers ---
-  const handleAddJob = () => {
-    setJobs([...jobs, createInitialJob()]);
+  // Jobs Array State
+  const [jobs, setJobs] = useState([
+    {
+      id: Date.now(),
+      jobNo: '',
+      rackType: 'HOOK',
+      workpieces: [
+        {
+          id: Date.now() + 1,
+          workpieceType: '',
+          quantity: '1',
+          unit: 'pcs',
+          weightLb: '',
+          hangingMode: 'INDIVIDUAL',
+          hangingPoints: '1',
+          point1SpecId: 'WIRE_12',
+          point1Strands: '1',
+          point2SpecId: 'WIRE_12',
+          point2Strands: '1'
+        }
+      ]
+    }
+  ]);
+
+  // Handlers for Job & Workpiece Changes
+  const handleJobChange = (jobIndex, field, value) => {
+    const updated = [...jobs];
+    updated[jobIndex][field] = value;
+    setJobs(updated);
   };
 
-  const handleRemoveJob = (jobIndex) => {
+  const handleWorkpieceChange = (jobIndex, wpIndex, field, value) => {
+    const updated = [...jobs];
+    updated[jobIndex].workpieces[wpIndex][field] = value;
+    setJobs(updated);
+  };
+
+  const addJobRow = () => {
+    setJobs([
+      ...jobs,
+      {
+        id: Date.now(),
+        jobNo: '',
+        rackType: 'HOOK',
+        workpieces: [
+          {
+            id: Date.now() + 1,
+            workpieceType: '',
+            quantity: '1',
+            unit: 'pcs',
+            weightLb: '',
+            hangingMode: 'INDIVIDUAL',
+            hangingPoints: '1',
+            point1SpecId: 'WIRE_12',
+            point1Strands: '1',
+            point2SpecId: 'WIRE_12',
+            point2Strands: '1'
+          }
+        ]
+      }
+    ]);
+  };
+
+  const removeJobRow = (jobIndex) => {
     if (jobs.length > 1) {
       setJobs(jobs.filter((_, idx) => idx !== jobIndex));
     }
   };
 
-  const handleJobChange = (jobIndex, field, value) => {
-    const updatedJobs = [...jobs];
-    updatedJobs[jobIndex][field] = value;
-    setJobs(updatedJobs);
+  const addWorkpieceRow = (jobIndex) => {
+    const updated = [...jobs];
+    updated[jobIndex].workpieces.push({
+      id: Date.now(),
+      workpieceType: '',
+      quantity: '1',
+      unit: 'pcs',
+      weightLb: '',
+      hangingMode: 'INDIVIDUAL',
+      hangingPoints: '1',
+      point1SpecId: 'WIRE_12',
+      point1Strands: '1',
+      point2SpecId: 'WIRE_12',
+      point2Strands: '1'
+    });
+    setJobs(updated);
   };
 
-  const handleAddWorkpieceRow = (jobIndex) => {
-    const updatedJobs = [...jobs];
-    updatedJobs[jobIndex].workpieces.push(createInitialWorkpiece());
-    setJobs(updatedJobs);
-  };
-
-  const handleRemoveWorkpieceRow = (jobIndex, wpIndex) => {
-    const updatedJobs = [...jobs];
-    if (updatedJobs[jobIndex].workpieces.length > 1) {
-      updatedJobs[jobIndex].workpieces = updatedJobs[jobIndex].workpieces.filter((_, idx) => idx !== wpIndex);
-      setJobs(updatedJobs);
+  const removeWorkpieceRow = (jobIndex, wpIndex) => {
+    const updated = [...jobs];
+    if (updated[jobIndex].workpieces.length > 1) {
+      updated[jobIndex].workpieces = updated[jobIndex].workpieces.filter((_, idx) => idx !== wpIndex);
+      setJobs(updated);
     }
   };
-
-  const handleWorkpieceChange = (jobIndex, wpIndex, field, value) => {
-    const updatedJobs = [...jobs];
-    updatedJobs[jobIndex].workpieces[wpIndex][field] = value;
-    setJobs(updatedJobs);
-  };
-
-  // Block submission if safety issues or enclosed cavities are unchecked
-  const isFormBlocked = !sopVentHoles || !sopDrainHoles || sopEnclosedCavity || !sopRiggingSecure;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (isFormBlocked) {
-      alert('Cannot submit: Please resolve all SOP safety hazards before proceeding.');
-      return;
-    }
-
-    const payload = {
-      rackId,
-      loadId,
-      surfacePreparation: {
-        hasPaintOrVarnish,
-        hasHeavyRust,
-        hasOilOrGrease
-      },
-      sopSafetyCheck: {
-        sopVentHoles,
-        sopDrainHoles,
-        sopEnclosedCavity,
-        sopRiggingSecure
-      },
-      jobs,
+    if (isFormBlocked) return;
+    
+    const formData = {
       operatorSignoffId,
+      jobs,
       submittedAt: new Date().toISOString()
     };
 
-    console.log('Submitted Galvanizing Form Payload:', payload);
-    alert('Form submitted successfully!');
+    if (onSubmit) {
+      onSubmit(formData);
+    } else {
+      console.log('Form Submitted Successfully:', formData);
+    }
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6 bg-slate-950 text-slate-100 rounded-2xl shadow-2xl border border-slate-800 space-y-6">
-      
-      {/* HEADER */}
-      <div className="border-b border-slate-800 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-wide text-cyan-400">
-            🔥 GALVANIZING RACK & RIGGING LOG
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Standard Operating Procedure & Load Safety Verification
-          </p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-cyan-300">
-          Operator: <span className="font-bold">{currentUser?.id || '7222'}</span>
-        </div>
-      </div>
-
+    <div className="max-w-5xl mx-auto p-4 bg-slate-950 text-slate-100 min-h-screen font-sans">
       <form onSubmit={handleSubmit} className="space-y-6">
-
-        {/* 1. RACK & SOP SETUP SECTION */}
-        <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/80 space-y-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-            📌 Step 1: Rack Assignment & Surface Assessment
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-            {/* Rack Selection */}
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">
-                Rack / Hook ID <span className="text-rose-400">*</span>
-              </label>
-              <select
-                value={rackId}
-                onChange={(e) => setRackId(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-                required
-              >
-                <option value="">-- Select Rack --</option>
-                {RACK_OPTIONS.map((r) => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Load ID */}
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">
-                Load / Batch ID <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. L-2026-088"
-                value={loadId}
-                onChange={(e) => setLoadId(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
-                required
-              />
-            </div>
-
-            {/* Surface Conditions */}
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Paint / Varnish?</label>
-              <select
-                value={hasPaintOrVarnish}
-                onChange={(e) => setHasPaintOrVarnish(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-              >
-                <option value="NO">No Paint/Varnish</option>
-                <option value="YES">Yes (Requires Blast)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Heavy Rust / Scale?</label>
-              <select
-                value={hasHeavyRust}
-                onChange={(e) => setHasHeavyRust(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-              >
-                <option value="NO">Normal / Light</option>
-                <option value="YES">Heavy (Extra Acid)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-400 mb-1">Oil / Grease?</label>
-              <select
-                value={hasOilOrGrease}
-                onChange={(e) => setHasOilOrGrease(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-              >
-                <option value="NO">Clean Surface</option>
-                <option value="YES">Heavy Grease</option>
-              </select>
-            </div>
+        
+        {/* Header & Add Job Controls */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-cyan-400">
+              ⚡ Hot-Dip Galvanizing SOP & Rigging Worksheet
+            </h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Multi-Job Workpiece Entry & Safety Rigging Verification
+            </p>
           </div>
-
-          {/* SOP Safety Checklist Grid */}
-          <div className="bg-slate-950 p-3.5 rounded-lg border border-slate-800 space-y-2">
-            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
-              ⚠️ Mandatory SOP Venting & Safety Verification
-            </span>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded border border-slate-800 hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={sopVentHoles}
-                  onChange={(e) => setSopVentHoles(e.target.checked)}
-                  className="rounded border-slate-700 text-cyan-500 focus:ring-0"
-                />
-                <span>Vent Holes Verified (High Points)</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded border border-slate-800 hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={sopDrainHoles}
-                  onChange={(e) => setSopDrainHoles(e.target.checked)}
-                  className="rounded border-slate-700 text-cyan-500 focus:ring-0"
-                />
-                <span>Drain Holes Verified (Low Points)</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer bg-slate-900/60 p-2 rounded border border-slate-800 hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={sopRiggingSecure}
-                  onChange={(e) => setSopRiggingSecure(e.target.checked)}
-                  className="rounded border-slate-700 text-cyan-500 focus:ring-0"
-                />
-                <span>Rigging Wire/Chain Tied Securely</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer bg-rose-950/30 p-2 rounded border border-rose-900/50 text-rose-300 hover:border-rose-800">
-                <input
-                  type="checkbox"
-                  checked={sopEnclosedCavity}
-                  onChange={(e) => setSopEnclosedCavity(e.target.checked)}
-                  className="rounded border-rose-700 text-rose-500 focus:ring-0"
-                />
-                <span className="font-bold">HAZARD: Unvented Sealed Cavity Exists!</span>
-              </label>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={addJobRow}
+            className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg shadow-md transition-all flex items-center gap-1.5"
+          >
+            <span>➕</span> Add Another Job
+          </button>
         </div>
 
-        {/* 2. CUSTOMER JOBS & WORKPIECE MAPPING */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-              📦 Step 2: Workpieces & Rigging Details
-            </h2>
-            <button
-              type="button"
-              onClick={handleAddJob}
-              className="px-3 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 rounded-lg text-xs font-bold transition-all"
-            >
-              + Add Customer Job
-            </button>
-          </div>
-
+        {/* 2. JOBS LIST */}
+        <div className="space-y-6">
           {jobs.map((job, jobIndex) => (
-            <div key={job.id} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800 space-y-4 relative">
+            <div key={job.id} className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-4 shadow-xl">
               
-              {/* Job Header Inputs */}
-              <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full">
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-0.5">
-                      Customer Name <span className="text-rose-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Apex Steel Ltd."
-                      value={job.customerName}
-                      onChange={(e) => handleJobChange(jobIndex, 'customerName', e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-slate-400 mb-0.5">
-                      Job / Work Order # <span className="text-rose-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. WO-99401"
-                      value={job.jobNumber}
-                      onChange={(e) => handleJobChange(jobIndex, 'jobNumber', e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 font-mono focus:outline-none focus:border-cyan-500"
-                      required
-                    />
-                  </div>
+              {/* Job Header Bar */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <span className="px-2.5 py-1 bg-cyan-950 text-cyan-400 text-xs font-mono font-bold rounded border border-cyan-800">
+                    JOB #{jobIndex + 1}
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Enter Job No. *"
+                    value={job.jobNo}
+                    onChange={(e) => handleJobChange(jobIndex, 'jobNo', e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono font-bold focus:outline-none focus:border-cyan-500 w-full sm:w-48"
+                    required
+                  />
                 </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => handleAddWorkpieceRow(jobIndex)}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-semibold border border-slate-700"
-                  >
-                    + Add Line
-                  </button>
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-slate-400 whitespace-nowrap">Rack / Fixture:</label>
+                    <select
+                      value={job.rackType}
+                      onChange={(e) => handleJobChange(jobIndex, 'rackType', e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+                    >
+                      {RACK_OPTIONS.map((r) => (
+                        <option key={r.id} value={r.id}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   {jobs.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => handleRemoveJob(jobIndex)}
-                      className="px-2 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded text-xs font-semibold border border-rose-800"
+                      onClick={() => removeJobRow(jobIndex)}
+                      className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-1 bg-rose-950/40 rounded border border-rose-900/60"
+                      title="Delete whole job"
                     >
-                      Delete Job
+                      🗑️ Delete Job
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Workpieces Table/Rows */}
+              {/* Workpieces Section */}
               <div className="space-y-3">
+                <div className="flex justify-between items-center px-1">
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    📦 Workpieces & Rigging Setup
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => addWorkpieceRow(jobIndex)}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 bg-cyan-950/50 px-2 py-1 rounded border border-cyan-800/60"
+                  >
+                    <span>➕</span> Add Workpiece Line
+                  </button>
+                </div>
+
                 {job.workpieces.map((wp, wpIndex) => {
-                  const qty = Number(wp.quantity) || 0;
-                  const totalW = Number(wp.weightLb) || 0;
+                  const qty = parseFloat(wp.quantity) || 0;
+                  const totalW = parseFloat(wp.weightLb) || 0;
                   const unitW = qty > 0 && totalW > 0 ? (totalW / qty).toFixed(1) : 0;
 
                   return (
@@ -451,7 +319,7 @@ export default function GalvanizingForm({ currentUser }) {
                           {job.workpieces.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => handleRemoveWorkpieceRow(jobIndex, wpIndex)}
+                              onClick={() => removeWorkpieceRow(jobIndex, wpIndex)}
                               className="mt-4 text-xs text-rose-400 hover:text-rose-300 font-bold px-1"
                               title="Delete line"
                             >
