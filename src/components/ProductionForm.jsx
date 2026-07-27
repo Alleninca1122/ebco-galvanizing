@@ -828,6 +828,8 @@ export default function ProductionForm({ currentUser, supabase }) {
 
                 </div>
               </div>
+            </div>
+          </div>
 
   {/* Racking Direction Notice Card */}
   {job.hasMaskingAgent && (
