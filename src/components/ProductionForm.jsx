@@ -786,7 +786,50 @@ export default function ProductionForm({ currentUser, supabase }) {
                     </div>
                   </div>
 
-{/* 7. Anti-Galvanizing Masking Agent Check */}
+{/* 7. Workpiece Surface Contact Check */}
+                  <div className="col-span-1 md:col-span-1 space-y-2">
+                    <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
+                      <span className="text-slate-300">8. Tight contact between workpieces?</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                            job.hasTightContact ? 'bg-amber-600 text-slate-950' : 'bg-slate-900 text-slate-400'
+                          }`}
+                        >
+                          YES
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', false)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold ${
+                            !job.hasTightContact ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'
+                          }`}
+                        >
+                          NO (Clearance OK)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Contact Correction Action Notice */}
+                    {job.hasTightContact && (
+                      <div className="bg-amber-950/40 border border-amber-600/50 rounded p-2.5 text-xs text-amber-200 flex items-start gap-2">
+                        <span className="text-amber-400 font-bold">🛑 Correction Required:</span>
+                        <div>
+                          <p className="font-semibold">Adjust spacing or insert wire separators immediately.</p>
+                          <p className="text-[11px] text-amber-300/80 mt-0.5">
+                            Tight contact causes bare spots (black marks) or forces items to fuse together in the zinc kettle.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+{/* 8. Anti-Galvanizing Masking Agent Check */}
 <div className="space-y-2 col-span-1 md:col-span-2">
   <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded border border-slate-800">
     <span className="text-slate-300">7. Coated with Masking / Stop-off Agent?</span>
