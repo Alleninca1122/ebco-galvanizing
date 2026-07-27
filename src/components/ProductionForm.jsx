@@ -451,7 +451,7 @@ export default function GalvanizingForm({ currentUser }) {
                           {job.workpieces.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => removeWorkpieceRow(jobIndex, wpIndex)}
+                              onClick={() => handleRemoveWorkpieceRow(jobIndex, wpIndex)}
                               className="mt-4 text-xs text-rose-400 hover:text-rose-300 font-bold px-1"
                               title="Delete line"
                             >
