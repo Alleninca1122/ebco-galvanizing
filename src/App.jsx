@@ -140,7 +140,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4">
       <header className="max-w-6xl mx-auto mb-6 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
         <div>
-          <h1 className="text-lg font-bold text-white tracking-wide">EBCO Galvanizing System</h1>
+          <h1 className="text-lg font-bold text-white tracking-wide">DEMO Galvanizing System</h1>
           <p className="text-xs text-slate-400">Integrated Shop-Floor Tracking Solution</p>
         </div>
 
