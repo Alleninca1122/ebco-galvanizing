@@ -1157,109 +1157,102 @@ const [assistantPin, setAssistantPin] = useState('');
                 </div>
               </div>
 
+   </div>
+          </div>
+        ))}
+
+        {/* 3. SIGN-OFF & SUBMIT SECTION */}
+        <div className="pt-4 border-t border-slate-800 space-y-4">
+          
+          {/* Employee ID & PIN Sign-off Input Box */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+            <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">
+              🚨 Employee Sign-off / Responsibility Confirmation <span className="text-rose-400">*</span>
+            </label>
+            <p className="text-[11px] text-slate-400">
+              Please enter Employee ID and 4-digit Security PIN to digitally sign off. Primary Operator sign-off is mandatory.
+            </p>
+
+            {/* Primary Operator Section (Mandatory) */}
+            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 space-y-2">
+              <span className="block text-[11px] font-bold text-cyan-400 uppercase">
+                PRIMARY OPERATOR (MANDATORY) <span className="text-rose-400">*</span>
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase">Employee ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2324"
+                    value={primaryOperatorId}
+                    onChange={(e) => setPrimaryOperatorId(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 uppercase">4-Digit Security PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    placeholder="••••"
+                    value={primaryPin}
+                    onChange={(e) => setPrimaryPin(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+                    required
+                  />
+                </div>
+              </div>
             </div>
 
+            {/* Assistant Operator Section (Optional) */}
+            <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/60 space-y-2">
+              <span className="block text-[11px] font-bold text-slate-400 uppercase">
+                ASSISTANT OPERATOR <span className="text-slate-500 font-normal">(OPTIONAL)</span>
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1 uppercase">Employee ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 8892"
+                    value={assistantOperatorId}
+                    onChange={(e) => setAssistantOperatorId(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-300 font-mono focus:outline-none focus:border-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1 uppercase">Security PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    placeholder="••••"
+                    value={assistantPin}
+                    onChange={(e) => setAssistantPin(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-300 font-mono focus:outline-none focus:border-slate-600"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        );
-      })}
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isFormBlocked}
+            className={`w-full py-3.5 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all ${
+              isFormBlocked
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20 cursor-pointer'
+            }`}
+          >
+            {isFormBlocked
+              ? '🚨 CANNOT SUBMIT: FIX SAFETY HAZARDS ABOVE'
+              : '🚨 Confirm & Sign-off →'}
+          </button>  
+        </div>
+
+      </form>
     </div>
-
-  </div>
-);
-})} {/* 👈 补齐：闭合单张 Job 卡片及外层 jobs.map 循环 */}
-
-{/* 3. SIGN-OFF & SUBMIT SECTION */}
-<div className="pt-4 border-t border-slate-800 space-y-4">
-  
-  {/* Employee ID & PIN Sign-off Input Box */}
-  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
-    <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">
-      🚨 Employee Sign-off / Responsibility Confirmation <span className="text-rose-400">*</span>
-    </label>
-    <p className="text-[11px] text-slate-400">
-      Please enter Employee ID and 4-digit Security PIN to digitally sign off. Primary Operator sign-off is mandatory.
-    </p>
-
-    {/* Primary Operator Section (Mandatory) */}
-    <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 space-y-2">
-      <span className="block text-[11px] font-bold text-cyan-400 uppercase">
-        PRIMARY OPERATOR (MANDATORY) <span className="text-rose-400">*</span>
-      </span>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-[10px] text-slate-400 mb-1 uppercase">Employee ID</label>
-          <input
-            type="text"
-            placeholder="e.g. 2324"
-            value={primaryOperatorId}
-            onChange={(e) => setPrimaryOperatorId(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-400 mb-1 uppercase">4-Digit Security PIN</label>
-          <input
-            type="password"
-            maxLength={4}
-            placeholder="••••"
-            value={primaryPin}
-            onChange={(e) => setPrimaryPin(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
-            required
-          />
-        </div>
-      </div>
-    </div>
-
-    {/* Assistant Operator Section (Optional) */}
-    <div className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/60 space-y-2">
-      <span className="block text-[11px] font-bold text-slate-400 uppercase">
-        ASSISTANT OPERATOR <span className="text-slate-500 font-normal">(OPTIONAL)</span>
-      </span>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-1 uppercase">Employee ID</label>
-          <input
-            type="text"
-            placeholder="e.g. 8892"
-            value={assistantOperatorId}
-            onChange={(e) => setAssistantOperatorId(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-300 font-mono focus:outline-none focus:border-slate-600"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 mb-1 uppercase">Security PIN</label>
-          <input
-            type="password"
-            maxLength={4}
-            placeholder="••••"
-            value={assistantPin}
-            onChange={(e) => setAssistantPin(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm text-slate-300 font-mono focus:outline-none focus:border-slate-600"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {/* Submit Button */}
-  <button
-    type="submit"
-    disabled={isFormBlocked}
-    className={`w-full py-3.5 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all ${
-      isFormBlocked
-        ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20 cursor-pointer'
-    }`}
-  >
-    {isFormBlocked
-      ? '🚨 CANNOT SUBMIT: FIX SAFETY HAZARDS ABOVE'
-      : '🚨 Confirm & Sign-off →'}
-  </button>  
-</div>
-
-</form>
-</div>
-);
-}
+  );
+}       
