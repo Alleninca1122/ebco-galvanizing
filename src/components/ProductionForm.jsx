@@ -987,9 +987,9 @@ const [assistantPin, setAssistantPin] = useState('');
                         </div>
                       </div>
 
-                      {/* Rigging & Hanging Setup for THIS Workpiece */}
+{/* Rigging & Hanging Setup for THIS Workpiece */}
                       <div className="pt-2.5 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-md space-y-2">
-                        
+
                         {/* Top Mode Selection */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-800/60">
                           <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1">
@@ -1049,13 +1049,13 @@ const [assistantPin, setAssistantPin] = useState('');
                           </div>
                         </div>
 
-{wp.hangingMode === 'STRING' && (
+                        {wp.hangingMode === 'STRING' && (
                           <div className="text-[10px] text-amber-300/90 bg-amber-950/40 border border-amber-900/60 px-2 py-1 rounded">
                             💡 <strong>String Mode Active:</strong> All {qty || 'N'} {wp.unit || 'pcs'} are chained together; total weight ({totalW || 0} lbs) is loaded onto the top rigging points.
                           </div>
                         )}
 
-                        {/* Preserved Original Rigging Specs & Strands inputs */}
+                        {/* Rigging Specs & Strands Inputs */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                           <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                             <div>
@@ -1114,7 +1114,7 @@ const [assistantPin, setAssistantPin] = useState('');
                           )}
                         </div>
 
-                        {/* Newly Appended Adapter & Secondary Safety Wire Options */}
+                        {/* Adapter & Secondary Safety Wire Options */}
                         <div className="bg-slate-900/80 p-2 rounded border border-slate-800 mt-2 space-y-2 text-[11px]">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
@@ -1155,16 +1155,9 @@ const [assistantPin, setAssistantPin] = useState('');
                               </label>
                             </div>
                           </div>
-                        </div> 
+                        </div>
 
-                    </div>
-                  );
-                })}
-              </div>
-
-            </div>
-          ))}
-        </div>
+                      </div>                 
 
         {/* 3. SIGN-OFF & SUBMIT SECTION */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
