@@ -1047,6 +1047,8 @@ const [assistantPin, setAssistantPin] = useState('');
                               </button>
                             </div>
                           </div>
+                        </div>
+
 {wp.hangingMode === 'STRING' && (
                           <div className="text-[10px] text-amber-300/90 bg-amber-950/40 border border-amber-900/60 px-2 py-1 rounded">
                             💡 <strong>String Mode Active:</strong> All {qty || 'N'} {wp.unit || 'pcs'} are chained together; total weight ({totalW || 0} lbs) is loaded onto the top rigging points.
@@ -1153,8 +1155,7 @@ const [assistantPin, setAssistantPin] = useState('');
                               </label>
                             </div>
                           </div>
-                        </div>
-                      </div>                      
+                        </div> 
 
                     </div>
                   );
