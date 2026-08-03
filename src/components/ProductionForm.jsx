@@ -50,7 +50,9 @@ export default function ProductionForm({ currentUser, supabase }) {
 
   // Sign-off State
 const [primaryOperatorId, setPrimaryOperatorId] = useState('');
+const [primaryPin, setPrimaryPin] = useState(''); 
 const [assistantOperatorId, setAssistantOperatorId] = useState('');
+const [assistantPin, setAssistantPin] = useState(''); 
 
   // Formatted Current Date & Day of Week
   const currentDateFormatted = new Date().toLocaleDateString('en-US', {
