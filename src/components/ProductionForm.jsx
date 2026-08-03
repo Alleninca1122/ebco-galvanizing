@@ -49,7 +49,8 @@ export default function ProductionForm({ currentUser, supabase }) {
   const [isGeneratingLoadId, setIsGeneratingLoadId] = useState(false);
 
   // Sign-off State
-  const [operatorSignoffId, setOperatorSignoffId] = useState('');
+const [primaryOperatorId, setPrimaryOperatorId] = useState('');
+const [assistantOperatorId, setAssistantOperatorId] = useState('');
 
   // Formatted Current Date & Day of Week
   const currentDateFormatted = new Date().toLocaleDateString('en-US', {
@@ -1123,38 +1124,61 @@ export default function ProductionForm({ currentUser, supabase }) {
         {/* 3. SIGN-OFF & SUBMIT SECTION */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
           
-          {/* Employee ID Sign-off Input Box */}
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-            <label className="block text-xs font-bold text-slate-200 uppercase">
-              ✍️ Employee Sign-off / Responsibility Confirmation <span className="text-rose-400">*</span>
+       {/* Employee ID Sign-off Input Box */}
+      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+        <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider">
+          🚨 Employee Sign-off / Responsibility Confirmation <span className="text-rose-400">*</span>
+        </label>
+        <p className="text-[11px] text-slate-400">
+          Please enter Employee IDs to digitally sign off. Primary Operator sign-off is mandatory.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          {/* Primary Operator (Mandatory / 负责操作员) */}
+          <div>
+            <label className="block text-xs font-bold text-cyan-400 mb-1">
+              PRIMARY OPERATOR ID <span className="text-rose-400">*</span>
             </label>
-            <p className="text-[11px] text-slate-400">
-              Please enter your Employee ID as a digital sign-off confirming that all SOP checks and rigging safety requirements have been verified.
-            </p>
             <input
               type="text"
-              placeholder="Enter your Employee ID (e.g. 2324)"
-              value={operatorSignoffId}
-              onChange={(e) => setOperatorSignoffId(e.target.value)}
-              className="w-full md:w-1/2 bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+              placeholder="e.g. 2324 (Mandatory)"
+              value={primaryOperatorId}
+              onChange={(e) => setPrimaryOperatorId(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
               required
             />
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isFormBlocked}
-            className={`w-full py-3.5 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all ${
-              isFormBlocked
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20 cursor-pointer'
-            }`}
-          >
-            {isFormBlocked
-              ? '🚫 CANNOT SUBMIT: FIX SAFETY HAZARDS ABOVE'
-              : '✍️ Confirm & Sign-off →'}
-          </button>
+          {/* Assistant Operator (Optional / 辅助操作员) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-400 mb-1">
+              ASSISTANT OPERATOR ID <span className="text-slate-500 font-normal">(OPTIONAL)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. 8892 (Optional)"
+              value={assistantOperatorId}
+              onChange={(e) => setAssistantOperatorId(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={isFormBlocked}
+        className={`w-full py-3.5 font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all ${
+          isFormBlocked
+            ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/20 cursor-pointer'
+        }`}
+      >
+        {isFormBlocked
+          ? '🚨 CANNOT SUBMIT: FIX SAFETY HAZARDS ABOVE'
+          : '🚨 Confirm & Sign-off →'}
+      </button>
         </div>
 
       </form>
