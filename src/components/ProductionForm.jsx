@@ -1047,14 +1047,13 @@ const [assistantPin, setAssistantPin] = useState('');
                               </button>
                             </div>
                           </div>
-                        </div>
-
-                        {wp.hangingMode === 'STRING' && (
+{wp.hangingMode === 'STRING' && (
                           <div className="text-[10px] text-amber-300/90 bg-amber-950/40 border border-amber-900/60 px-2 py-1 rounded">
                             💡 <strong>String Mode Active:</strong> All {qty || 'N'} {wp.unit || 'pcs'} are chained together; total weight ({totalW || 0} lbs) is loaded onto the top rigging points.
                           </div>
                         )}
 
+                        {/* Preserved Original Rigging Specs & Strands inputs */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                           <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2 rounded border border-slate-800">
                             <div>
@@ -1112,7 +1111,50 @@ const [assistantPin, setAssistantPin] = useState('');
                             </div>
                           )}
                         </div>
-                      </div>
+
+                        {/* Newly Appended Adapter & Secondary Safety Wire Options */}
+                        <div className="bg-slate-900/80 p-2 rounded border border-slate-800 mt-2 space-y-2 text-[11px]">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-0.5">
+                                Anchor Shackle / Slot Adapter
+                              </label>
+                              <select
+                                value={wp.anchorShackle || 'NONE'}
+                                onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'anchorShackle', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[11px] text-slate-100 focus:outline-none focus:border-cyan-500"
+                              >
+                                <option value="NONE">-- None (Direct Chain / Hooking) --</option>
+                                <option value="3_8_SHACKLE">3/8" Anchor Shackle (WLL: 1.0 Ton / 2,200 lbs)</option>
+                                <option value="1_2_SHACKLE">1/2" Anchor Shackle (WLL: 2.0 Ton / 4,400 lbs)</option>
+                                <option value="5_8_SHACKLE">5/8" Anchor Shackle (WLL: 3.25 Ton / 7,150 lbs)</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1 pt-3">
+                              <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-slate-100 text-[10px]">
+                                <input
+                                  type="checkbox"
+                                  checked={!!wp.secondaryWireLatch}
+                                  onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'secondaryWireLatch', e.target.checked)}
+                                  className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0"
+                                />
+                                <span>Apply Secondary Wire Latch (12-Gauge Anti-Jump Safety)</span>
+                              </label>
+
+                              <label className="flex items-center gap-1.5 cursor-pointer text-amber-400 hover:text-amber-300 text-[10px]">
+                                <input
+                                  type="checkbox"
+                                  checked={!!wp.hasExtensionWire}
+                                  onChange={(e) => handleWorkpieceChange(jobIndex, wpIndex, 'hasExtensionWire', e.target.checked)}
+                                  className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-0"
+                                />
+                                <span>Top Wire Extension Used (Cap Load at Wire Limit)</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>                      
 
                     </div>
                   );
