@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProductionForm from './components/ProductionForm';
 import NextStepProcessPortal from './components/NextStepProcessPortal';
+import { BRAND } from './config/brand';
 
 export default function App() {
+  useEffect(() => {
+    document.title = BRAND.systemTitle;
+  }, []);
+
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('loading');
 
@@ -57,7 +62,7 @@ export default function App() {
 
           <div className="text-center mb-8">
             <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest block mb-1">
-              Demo Galvanizing Operations
+              {BRAND.headerTitle}
             </span>
             <h1 className="text-2xl font-extrabold text-white">Shop-Floor Portal</h1>
             <p className="text-xs text-slate-400 mt-1">Sign in to start your shift</p>
@@ -140,7 +145,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4">
       <header className="max-w-6xl mx-auto mb-6 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
         <div>
-          <h1 className="text-lg font-bold text-white tracking-wide">DEMO Galvanizing System</h1>
+          <h1 className="text-lg font-bold text-white tracking-wide">{BRAND.headerTitle}</h1>
           <p className="text-xs text-slate-400">Integrated Shop-Floor Tracking Solution</p>
         </div>
 
