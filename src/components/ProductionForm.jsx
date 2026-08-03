@@ -531,7 +531,7 @@ export default function ProductionForm({ currentUser, supabase }) {
               </div>
 
               {/* Basic Job Info */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">
                     Customer Name <span className="text-rose-400">*</span>
@@ -575,6 +575,23 @@ export default function ProductionForm({ currentUser, supabase }) {
                     required
                   />
                 </div>
+<div>
+    <label className="block text-xs text-slate-400 mb-1">Priority / 优先级</label>
+    <button
+      type="button"
+      onClick={() => handleJobFieldChange(jobIndex, 'isRush', !job.isRush)}
+      className={`w-full py-2 px-3 text-xs font-bold rounded-lg border transition-all flex items-center justify-between ${
+        job.isRush 
+          ? 'bg-rose-600/20 border-rose-500 text-rose-400 shadow-lg shadow-rose-900/20' 
+          : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+      }`}
+    >
+      <span className="flex items-center gap-1">⚡ RUSH ORDER</span>
+      <span className={`px-2 py-0.5 rounded text-[10px] ${job.isRush ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+        {job.isRush ? 'YES' : 'NO'}
+      </span>
+    </button>
+  </div>              
               </div>
 
               {/* Surface Assessment Section */}
