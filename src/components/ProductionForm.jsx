@@ -576,7 +576,7 @@ export default function ProductionForm({ currentUser, supabase }) {
                   />
                 </div>
 <div>
-    <label className="block text-xs text-slate-400 mb-1">Priority / 优先级</label>
+    <label className="block text-xs text-slate-400 mb-1">Priority</label>
     <button
       type="button"
       onClick={() => handleJobFieldChange(jobIndex, 'isRush', !job.isRush)}
