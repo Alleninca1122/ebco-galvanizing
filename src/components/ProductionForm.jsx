@@ -877,7 +877,7 @@ const [assistantPin, setAssistantPin] = useState('');
                 </div>
               </div>
 
-              {/* Dynamic Workpiece Lines */}
+       {/* Dynamic Workpiece Lines */}
               <div className="pt-2 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -987,7 +987,7 @@ const [assistantPin, setAssistantPin] = useState('');
                         </div>
                       </div>
 
-{/* Rigging & Hanging Setup for THIS Workpiece */}
+                      {/* Rigging & Hanging Setup for THIS Workpiece */}
                       <div className="pt-2.5 border-t border-slate-800/80 bg-slate-950/40 p-2.5 rounded-md space-y-2">
 
                         {/* Top Mode Selection */}
@@ -1157,7 +1157,12 @@ const [assistantPin, setAssistantPin] = useState('');
                           </div>
                         </div>
 
-                      </div>                 
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>                
 
         {/* 3. SIGN-OFF & SUBMIT SECTION */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
