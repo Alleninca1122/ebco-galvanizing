@@ -57,7 +57,7 @@ export default function App() {
 
           <div className="text-center mb-8">
             <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest block mb-1">
-              EBCO Galvanizing Operations
+              Demo Galvanizing Operations
             </span>
             <h1 className="text-2xl font-extrabold text-white">Shop-Floor Portal</h1>
             <p className="text-xs text-slate-400 mt-1">Sign in to start your shift</p>
