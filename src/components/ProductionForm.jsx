@@ -1223,6 +1223,13 @@ const [assistantPin, setAssistantPin] = useState('');
   )}
 
 </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* 3. SIGN-OFF & SUBMIT SECTION */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
