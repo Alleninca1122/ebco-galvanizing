@@ -819,7 +819,7 @@ const [assistantPin, setAssistantPin] = useState('');
                       >
                         NO
                       </button>
-                     {/* YES 按钮：点击前是 YES，点击后变红并显示 YES (Action Required) */}
+                     {/* YES button: turns red and shows "Action Required" once selected */}
                       <button
                         type="button"
                         onClick={() => handleJobFieldChange(jobIndex, 'hasTightContact', true)}
@@ -1057,16 +1057,16 @@ const [assistantPin, setAssistantPin] = useState('');
     </div>
   )}
 
-  {/* 1. Stringing Method 动态切换模块 */}
+  {/* 1. Stringing Method dynamic switcher */}
   <div className="space-y-1.5 pt-1">
     <label className="block text-[10px] font-semibold text-slate-300 uppercase tracking-wide">
-      Stringing Method (串挂/吊挂模式)
+      Stringing Method
     </label>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
       {[
-        { id: 'FULL_CHAIN', label: 'Full Chain', desc: '全锁链 (高安全)' },
-        { id: 'CHAIN_WIRE', label: 'Chain + Wire', desc: '锁链 + 铁丝' },
-        { id: 'PURE_WIRE', label: 'Pure Wire', desc: '全铁丝 (需限重)' },
+        { id: 'FULL_CHAIN', label: 'Full Chain', desc: 'High Safety' },
+        { id: 'CHAIN_WIRE', label: 'Chain + Wire', desc: 'Chain + Wire' },
+        { id: 'PURE_WIRE', label: 'Pure Wire', desc: 'Weight Limited' },
       ].map((method) => {
         const isSelected = (wp.stringingMethod || 'FULL_CHAIN') === method.id;
         return (
@@ -1091,8 +1091,8 @@ const [assistantPin, setAssistantPin] = useState('');
       <div className="p-2 rounded bg-amber-950/40 border border-amber-500/50 text-amber-200 text-[10px] flex items-start gap-2">
         <span>⚠️</span>
         <div>
-          <strong className="font-semibold">已开启全额累加载荷计算：</strong>
-          纯铁丝在高温锌液下抗拉强度衰减较快，系统已自动调低安全系数上限！
+          <strong className="font-semibold">Full Cumulative Load Calculation Enabled:</strong>
+          Pure wire loses tensile strength faster in high-temp zinc — the system has automatically lowered the safety margin!
         </div>
       </div>
     )}
@@ -1161,7 +1161,7 @@ const [assistantPin, setAssistantPin] = useState('');
   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
     <div>
       <label className="block text-[10px] font-semibold text-slate-300 mb-1">
-        Anchor Shackle (卸扣规格选配)
+        Anchor Shackle (Optional)
       </label>
       <select
         value={wp.anchorShackle || 'NONE'}
@@ -1188,9 +1188,9 @@ const [assistantPin, setAssistantPin] = useState('');
         />
         <div className="text-[10px]">
           <span className="font-medium text-slate-200 group-hover:text-cyan-300">
-            Secondary Wire Latch (二次安全防脱锁)
+            Secondary Wire Latch
           </span>
-          <p className="text-slate-400">主承重靠锁链/卸扣，铁丝仅作双重保险。</p>
+          <p className="text-slate-400">Primary support comes from the chain/shackle; wire is only a secondary backup.</p>
         </div>
       </label>
 
@@ -1204,9 +1204,9 @@ const [assistantPin, setAssistantPin] = useState('');
         />
         <div className="text-[10px]">
           <span className="font-medium text-slate-200 group-hover:text-amber-300">
-            Use Wire Extension at Top (顶部延长铁丝)
+            Use Wire Extension at Top
           </span>
-          <p className="text-slate-400">主吊点上方使用了铁丝做长度延伸。</p>
+          <p className="text-slate-400">Wire is used above the main hanging point to extend its length.</p>
         </div>
       </label>
     </div>
@@ -1216,8 +1216,8 @@ const [assistantPin, setAssistantPin] = useState('');
     <div className="p-2.5 rounded bg-rose-950/40 border border-rose-500/50 text-rose-200 text-[10px] flex items-start gap-2">
       <span>🚨</span>
       <div>
-        <strong className="font-bold">顶部延长铁丝警告：</strong>
-        系统已自动将整体载荷瓶颈切换为顶部铁丝极限承重，严防“强链连接弱丝”！
+        <strong className="font-bold">Top Wire Extension Warning:</strong>
+        The system has automatically switched the overall load bottleneck to the top wire's rated capacity, to prevent a "strong chain, weak wire" failure!
       </div>
     </div>
   )}
