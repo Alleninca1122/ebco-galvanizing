@@ -14,9 +14,8 @@ const QTY_UNITS = [
   { value: 'box', label: 'box' }
 ];
 
-// Hook Option on top, followed by 30 Fixed Racks
-const RACK_OPTIONS = [
-  { value: 'HOOK', label: '🪝 Hook / Direct Sling (No Rack)' },
+// 30 Fixed Racks
+const RACK_OPTIONS =
   ...Array.from({ length: 30 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     return { value: num, label: `Rack #${num}` };
