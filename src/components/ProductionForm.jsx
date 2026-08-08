@@ -14,14 +14,11 @@ const QTY_UNITS = [
   { value: 'box', label: 'box' }
 ];
 
-// Hook Option on top, followed by 30 Fixed Racks
-const RACK_OPTIONS = [
-  { value: 'HOOK', label: '🪝 Hook / Direct Sling (No Rack)' },
-  ...Array.from({ length: 30 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    return { value: num, label: `Rack #${num}` };
-  })
-];
+// 30 Fixed Racks
+const RACK_OPTIONS = Array.from({ length: 30 }, (_, i) => {
+  const num = String(i + 1).padStart(2, '0');
+  return { value: num, label: `Rack #${num}` };
+});
 
 // Rigging Specifications (SWL per strand in lbs)
 const RIGGING_SPECS = [
@@ -263,7 +260,7 @@ const [assistantPin, setAssistantPin] = useState('');
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!rackNo || !loadId.trim()) {
-      alert('Please select a Rack # or Loading Method first.');
+      alert('Please select a Rack # first.');
       return;
     }
 
@@ -447,7 +444,7 @@ const [assistantPin, setAssistantPin] = useState('');
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
-                Rack # / Loading Method <span className="text-rose-400">*</span>
+                Rack # <span className="text-rose-400">*</span>
               </label>
               <select
                 value={rackNo}
@@ -455,7 +452,7 @@ const [assistantPin, setAssistantPin] = useState('');
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-cyan-300 font-mono font-bold text-base focus:outline-none focus:border-cyan-400"
                 required
               >
-                <option value="">-- Select Rack # or Method --</option>
+                <option value="">-- Select Rack # --</option>
                 {RACK_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
