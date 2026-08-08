@@ -16,10 +16,9 @@ const QTY_UNITS = [
 
 // 30 Fixed Racks
 const RACK_OPTIONS = Array.from({ length: 30 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    return { value: num, label: `Rack #${num}` };
-  })
-];
+  const num = String(i + 1).padStart(2, '0');
+  return { value: num, label: `Rack #${num}` };
+});
 
 // Rigging Specifications (SWL per strand in lbs)
 const RIGGING_SPECS = [
